@@ -1,0 +1,20 @@
+{
+  "patient_id": "P12345",
+  "medical_record_number": "MRN-12345",
+  "date_of_birth": "1975-06-15",
+  "gender": "M",
+  "chief_complaint": "Chest pain and shortness of breath",
+  "medical_history": [
+    "Hypertension",
+    "Type 2 Diabetes",
+    "Hyperlipidemia"
+  ],
+  "medications": [
+    "Metformin 500mg BID",
+    "Lisinopril 10mg daily",
+    "Atorvastatin 20mg daily"
+  ],
+  "allergies": [
+    "Penicillin"
+  ]
+}

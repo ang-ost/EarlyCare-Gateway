@@ -1,0 +1,34 @@
+EMERGENCY DEPARTMENT NOTE
+
+Chief Complaint: Chest pain radiating to left arm
+
+History of Present Illness:
+Patient is a 50-year-old male presenting with acute onset substernal chest pain 
+started 2 hours ago. Pain is described as crushing, 8/10 severity, radiating 
+to left arm. Associated with diaphoresis, nausea, and shortness of breath.
+Denies recent trauma or fever.
+
+Past Medical History:
+- Hypertension (on Lisinopril)
+- Type 2 Diabetes (on Metformin)
+- Hyperlipidemia (on Atorvastatin)
+
+Vital Signs:
+BP: 165/95 mmHg
+HR: 105 bpm
+RR: 22/min
+SpO2: 94% on room air
+Temp: 37.1°C
+
+Physical Examination:
+General: Anxious, diaphoretic
+Cardiovascular: Tachycardic, regular rhythm, no murmurs
+Respiratory: Clear to auscultation bilaterally
+Abdomen: Soft, non-tender
+
+Assessment & Plan:
+Acute chest pain, concerning for acute coronary syndrome.
+- ECG obtained
+- Cardiac enzymes ordered
+- Cardiology consult requested
+- Patient placed on telemetry monitoring

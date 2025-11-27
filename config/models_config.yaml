@@ -1,0 +1,131 @@
+# AI Model Strategy Configuration
+
+# Strategy Selection
+strategy_selection:
+  mode: "auto"  # auto, ensemble, single
+  enable_ensemble: true
+  fallback_to_default: true
+
+# Domain Strategies
+domain_strategies:
+  cardiology:
+    enabled: true
+    model_version: "2.1.0"
+    confidence_threshold: 0.6
+    keywords:
+      - "heart"
+      - "cardiac"
+      - "chest pain"
+      - "ecg"
+      - "arrhythmia"
+    
+  neurology:
+    enabled: true
+    model_version: "1.8.0"
+    confidence_threshold: 0.65
+    keywords:
+      - "brain"
+      - "stroke"
+      - "seizure"
+      - "headache"
+      - "neurological"
+    
+  pulmonology:
+    enabled: true
+    model_version: "1.5.0"
+    confidence_threshold: 0.6
+    keywords:
+      - "lung"
+      - "respiratory"
+      - "breathing"
+      - "pneumonia"
+      - "copd"
+    
+  oncology:
+    enabled: true
+    model_version: "2.0.0"
+    confidence_threshold: 0.7
+    keywords:
+      - "cancer"
+      - "tumor"
+      - "malignancy"
+      - "biopsy"
+      
+  radiology:
+    enabled: true
+    model_version: "1.9.0"
+    confidence_threshold: 0.65
+    keywords:
+      - "imaging"
+      - "x-ray"
+      - "ct"
+      - "mri"
+      - "scan"
+
+# Device Strategies
+device_strategies:
+  cardiac:
+    enabled: true
+    model_version: "1.6.0"
+    signal_types:
+      - "ECG"
+      - "EKG"
+    sampling_rate_min: 100  # Hz
+    confidence_threshold: 0.65
+    
+  neurological:
+    enabled: true
+    model_version: "1.4.0"
+    signal_types:
+      - "EEG"
+    sampling_rate_min: 250  # Hz
+    confidence_threshold: 0.7
+    
+  respiratory:
+    enabled: true
+    model_version: "1.3.0"
+    signal_types:
+      - "SpO2"
+      - "Respiration"
+    sampling_rate_min: 1  # Hz
+    confidence_threshold: 0.6
+
+# Pathology Strategies
+pathology_strategies:
+  cancer:
+    enabled: true
+    model_version: "2.2.0"
+    supported_modalities:
+      - "PATHOLOGY"
+      - "MRI"
+      - "CT"
+      - "PET"
+    confidence_threshold: 0.75
+    
+  tissue:
+    enabled: true
+    model_version: "1.7.0"
+    supported_modalities:
+      - "PATHOLOGY"
+    confidence_threshold: 0.7
+
+# Ensemble Configuration
+ensemble:
+  enabled: true
+  voting_method: "weighted"  # weighted, majority, unanimous
+  min_models: 2
+  max_models: 5
+  weight_by_confidence: true
+
+# Model Performance Thresholds
+performance:
+  min_confidence_score: 0.5
+  max_processing_time_ms: 10000
+  enable_model_monitoring: true
+  
+# Explainability
+explainability:
+  enabled: true
+  generate_feature_importance: true
+  include_evidence: true
+  max_evidence_items: 5

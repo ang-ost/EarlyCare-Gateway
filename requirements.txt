@@ -1,0 +1,53 @@
+# Core dependencies
+python>=3.8
+
+# Data processing
+numpy>=1.21.0
+pandas>=1.3.0
+
+# Cryptography and security
+cryptography>=41.0.0
+
+# Clinical data formats (optional - install as needed)
+# hl7apy>=1.3.4  # For HL7 v2 messaging
+# fhir.resources>=6.5.0  # For FHIR R4
+# pydicom>=2.4.0  # For DICOM imaging
+# pynetdicom>=2.0.0  # For DICOM networking
+
+# Monitoring and logging
+python-json-logger>=2.0.0
+
+# Date/time handling
+python-dateutil>=2.8.0
+
+# Configuration
+pyyaml>=6.0
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-asyncio>=0.21.0
+
+# Code quality
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.4.0
+
+# Optional: Machine Learning (if using real models)
+# scikit-learn>=1.3.0
+# torch>=2.0.0
+# tensorflow>=2.13.0
+# transformers>=4.30.0
+
+# Optional: API development
+# fastapi>=0.100.0
+# uvicorn>=0.23.0
+# pydantic>=2.0.0
+
+# Optional: Database
+# sqlalchemy>=2.0.0
+# psycopg2-binary>=2.9.0  # PostgreSQL
+
+# Optional: Message queues
+# celery>=5.3.0
+# redis>=4.6.0

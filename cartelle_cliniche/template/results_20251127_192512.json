@@ -1,0 +1,98 @@
+{
+  "request_id": "1b4aa496-8a51-4e06-bc17-42ab00a96027",
+  "patient_id": "P12345",
+  "timestamp": "2025-11-27T19:25:12.308572",
+  "diagnoses": [
+    {
+      "condition": "Cardiology Condition Detected",
+      "icd_code": null,
+      "confidence_score": 0.72,
+      "confidence_level": "high",
+      "evidence": [
+        "Cardiology indicators found",
+        "Clinical correlation"
+      ],
+      "recommended_tests": [
+        "Cardiology specialist consultation"
+      ]
+    },
+    {
+      "condition": "Pulmonology Condition Detected",
+      "icd_code": null,
+      "confidence_score": 0.72,
+      "confidence_level": "high",
+      "evidence": [
+        "Pulmonology indicators found",
+        "Clinical correlation"
+      ],
+      "recommended_tests": [
+        "Pulmonology specialist consultation"
+      ]
+    },
+    {
+      "condition": "Radiology Condition Detected",
+      "icd_code": null,
+      "confidence_score": 0.72,
+      "confidence_level": "high",
+      "evidence": [
+        "Radiology indicators found",
+        "Clinical correlation"
+      ],
+      "recommended_tests": [
+        "Radiology specialist consultation"
+      ]
+    },
+    {
+      "condition": "Abnormal ECG Pattern",
+      "icd_code": null,
+      "confidence_score": 0.68,
+      "confidence_level": "medium",
+      "evidence": [
+        "ECG signal analysis",
+        "Pattern recognition"
+      ],
+      "recommended_tests": [
+        "Extended ECG monitoring"
+      ]
+    }
+  ],
+  "urgency_level": "soon",
+  "triage_score": 45.0,
+  "alerts": [],
+  "warnings": [],
+  "models_used": [
+    "domain_cardiology",
+    "domain_pulmonology",
+    "domain_radiology",
+    "device_cardiac",
+    "ensemble"
+  ],
+  "processing_time_ms": 0.439,
+  "explanation": "Ensemble of 4 models",
+  "metadata": {
+    "context": {
+      "validation": {
+        "is_valid": true,
+        "errors": [],
+        "warnings": []
+      },
+      "enrichment": {
+        "processing_timestamp": "2025-11-27T19:25:12.308540",
+        "data_count": 3,
+        "average_data_quality": 1.0,
+        "has_text_data": true,
+        "has_signal_data": true,
+        "has_image_data": false,
+        "has_critical_history": true
+      },
+      "triage": {
+        "score": 45.0,
+        "priority": "soon",
+        "factors": [
+          "Base priority: routine",
+          "Critical medical history"
+        ]
+      }
+    }
+  }
+}

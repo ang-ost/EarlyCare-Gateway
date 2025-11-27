@@ -1,0 +1,87 @@
+# Gateway Configuration
+gateway:
+  name: "EarlyCare Gateway"
+  version: "1.0.0"
+  
+  # Processing chain configuration
+  chain:
+    handlers:
+      - type: "validation"
+        enabled: true
+        strict_mode: true
+        
+      - type: "enrichment"
+        enabled: true
+        calculate_quality_scores: true
+        
+      - type: "triage"
+        enabled: true
+        scoring:
+          base_weights:
+            emergency: 100
+            urgent: 75
+            soon: 50
+            routine: 25
+          age_threshold_young: 2
+          age_threshold_elderly: 75
+          age_bonus: 15
+          history_complexity_threshold: 3
+          history_bonus: 10
+          critical_history_bonus: 20
+          low_quality_threshold: 0.7
+          low_quality_bonus: 10
+          
+      - type: "privacy_check"
+        enabled: true
+        auto_anonymize: false
+        require_consent: true
+
+  # Response time configuration (milliseconds)
+  response_times:
+    emergency: 1000     # 1 second
+    urgent: 5000        # 5 seconds
+    soon: 15000         # 15 seconds
+    routine: 30000      # 30 seconds
+    
+  # Performance settings
+  performance:
+    max_processing_time_ms: 30000
+    enable_caching: true
+    cache_ttl_seconds: 300
+    parallel_processing: false
+
+# Monitoring Configuration
+monitoring:
+  enabled: true
+  
+  observers:
+    metrics:
+      enabled: true
+      export_interval_seconds: 60
+      
+    audit:
+      enabled: true
+      log_directory: "logs/audit"
+      max_log_size_mb: 100
+      
+    performance:
+      enabled: true
+      alert_threshold_ms: 5000
+      slow_request_logging: true
+      
+    data_quality:
+      enabled: true
+      quality_threshold: 0.7
+
+# Logging Configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "json"
+  handlers:
+    console:
+      enabled: true
+    file:
+      enabled: true
+      path: "logs/gateway.log"
+      max_size_mb: 50
+      backup_count: 5

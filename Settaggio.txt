@@ -1,0 +1,7 @@
+- sistema che riconosce se un paziente è già presente nel db 
+- ampliare il form con informazioni riguardanti il triage della data attuale
+- i form vengono convertiti automaticamente in json e salvati nella cartella del paziente se esiste( verifica con CF) altrimenti si crea una nuova cartella
+- rivedere diagnosi AI perchè stesso risultato
+- unico upload sia cartella che file
+- aggiungi triage invece di nuovo paziente
+- se apro una cartella nella dashboard posso selezionare il file a cui effetuare la diagnosi 
