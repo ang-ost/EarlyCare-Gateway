@@ -73,6 +73,17 @@ monitoring:
       enabled: true
       quality_threshold: 0.7
 
+# Database Configuration
+database:
+  mongodb:
+    enabled: true
+    connection_string: "mongodb://localhost:27017/"
+    database_name: "earlycare"
+    # Optional authentication
+    # username: "earlycare_user"
+    # password: "your_password"
+    # authentication_database: "admin"
+
 # Logging Configuration
 logging:
   level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL

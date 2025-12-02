@@ -93,3 +93,6 @@ docs/_build/
 # Distribution
 *.tar.gz
 *.zip
+
+# MongoDB
+credenzialiMongoDB.txt
