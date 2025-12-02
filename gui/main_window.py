@@ -25,7 +25,7 @@ class EarlyCareGUI:
     
     def __init__(self, root):
         self.root = root
-        self.root.title("🏥 EarlyCare Gateway - Clinical Decision Support System")
+        self.root.title("🏥 MAV - Medical Access & Vision")
         self.root.geometry("1200x800")
         
         # Initialize gateway
@@ -133,7 +133,7 @@ class EarlyCareGUI:
         # Title
         title_label = ttk.Label(
             header,
-            text="🏥 EarlyCare Gateway",
+            text="🏥 MAV",
             style='Header.TLabel'
         )
         title_label.pack(side='left', padx=20, pady=20)
@@ -141,7 +141,7 @@ class EarlyCareGUI:
         # Subtitle
         subtitle_label = ttk.Label(
             header,
-            text="Clinical Decision Support System",
+            text="Medical Access & Vision",
             style='Header.TLabel',
             font=('Segoe UI', 10)
         )
@@ -186,26 +186,24 @@ class EarlyCareGUI:
         )
         folder_label.pack(side='left', fill='x', expand=True)
         
-        select_folder_btn = ttk.Button(
+        # Upload button with menu
+        upload_btn = ttk.Menubutton(
             folder_frame,
-            text="Seleziona Cartella",
-            command=self.select_folder,
+            text="📤 Upload",
             style='Primary.TButton'
         )
-        select_folder_btn.pack(side='right', padx=(10, 0))
+        upload_btn.pack(side='right', padx=(10, 0))
         
-        select_file_btn = ttk.Button(
-            folder_frame,
-            text="Seleziona File",
-            command=self.select_file,
-            style='Primary.TButton'
-        )
-        select_file_btn.pack(side='right', padx=(5, 0))
+        # Create menu for upload options
+        upload_menu = tk.Menu(upload_btn, tearoff=0)
+        upload_menu.add_command(label="📁 Cartella Clinica", command=self.select_folder)
+        upload_menu.add_command(label="📄 File Singolo", command=self.select_file)
+        upload_btn['menu'] = upload_menu
         
         # New Patient button
         new_patient_btn = ttk.Button(
             folder_frame,
-            text="📝 Nuovo Paziente",
+            text="📝 Aggiungi Scheda",
             command=self.open_patient_form,
             style='Primary.TButton'
         )

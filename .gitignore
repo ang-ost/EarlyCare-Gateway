@@ -1,4 +1,5 @@
 credenziali_db.txt
+Settaggio.txt
 # Python
 __pycache__/
 *.py[cod]
@@ -95,5 +96,3 @@ docs/_build/
 *.tar.gz
 *.zip
 
-# MongoDB
-credenzialiMongoDB.txt

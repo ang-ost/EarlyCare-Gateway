@@ -1,4 +1,5 @@
 - sistema che riconosce se un paziente è già presente nel db 
+- elimina pop up ' paziente inserito correttamente'
 - ampliare il form con informazioni riguardanti il triage della data attuale
 - i form vengono convertiti automaticamente in json e salvati nella cartella del paziente se esiste( verifica con CF) altrimenti si crea una nuova cartella
 - rivedere diagnosi AI perchè stesso risultato, consiglia farmaci ed esami da fare
