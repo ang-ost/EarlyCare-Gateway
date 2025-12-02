@@ -77,8 +77,12 @@ monitoring:
 database:
   mongodb:
     enabled: true
-    connection_string: "mongodb://localhost:27017/"
+    connection_string: "mongodb+srv://angelospeed2003:kjhwoP4rXR3UsnaV@mav.0zz64yh.mongodb.net/?retryWrites=true&w=majority"
     database_name: "earlycare"
+    # MongoDB Atlas (cloud) settings
+    use_ssl: true
+    ssl_allow_invalid_certificates: true  # Set to false in production with proper certificates
+    server_selection_timeout_ms: 5000
     # Optional authentication
     # username: "earlycare_user"
     # password: "your_password"

@@ -17,7 +17,16 @@ from src.gateway.clinical_gateway import ClinicalGateway
 from src.gateway.folder_processor import ClinicalFolderProcessor
 from src.strategy.strategy_selector import StrategySelector
 from src.observer.metrics_observer import MetricsObserver, AuditObserver
+from src.models.patient import Patient, Gender
 from gui.patient_form import PatientFormDialog
+
+# MongoDB integration
+try:
+    from src.database.mongodb_repository import MongoDBPatientRepository
+    MONGODB_AVAILABLE = True
+except ImportError:
+    MONGODB_AVAILABLE = False
+    MongoDBPatientRepository = None
 
 
 class EarlyCareGUI:
@@ -35,6 +44,10 @@ class EarlyCareGUI:
         self.current_folder = None
         self.current_file = None
         self.is_single_file = False
+        
+        # MongoDB database
+        self.db = None
+        self.db_connected = False
         
         # Configure style
         self.setup_style()
@@ -354,6 +367,21 @@ class EarlyCareGUI:
             
             # Create processor
             self.processor = ClinicalFolderProcessor(self.gateway)
+            
+            # Initialize MongoDB connection (optional)
+            if MONGODB_AVAILABLE:
+                try:
+                    self.db = MongoDBPatientRepository(
+                        connection_string="mongodb+srv://angelospeed2003:kjhwoP4rXR3UsnaV@mav.0zz64yh.mongodb.net/",
+                        database_name="earlycare"
+                    )
+                    self.db_connected = True
+                    self.log("✅ Database MongoDB connesso")
+                except Exception as db_error:
+                    self.log(f"⚠ MongoDB non disponibile: {db_error}")
+                    self.db_connected = False
+            else:
+                self.log("⚠ Modulo pymongo non installato - Database disabilitato")
             
             self.log("✅ Sistema inizializzato correttamente")
             self.set_system_status(True)
@@ -845,6 +873,35 @@ nella directory del progetto.
             """Callback when patient data is saved."""
             self.log(f"📝 Dati paziente inseriti: {patient_data['patient_id']}")
             
+            # Save to MongoDB if available
+            if self.db_connected and self.db:
+                try:
+                    # Convert patient_data to Patient object
+                    patient = self.convert_form_data_to_patient(patient_data)
+                    
+                    # Save to database
+                    if self.db.save_patient(patient):
+                        self.log(f"✓ Paziente salvato nel database MongoDB")
+                        
+                        # Log audit event
+                        self.db.log_audit_event(
+                            event_type="create",
+                            user_id="GUI_USER",
+                            action=f"Created patient record via GUI: {patient.patient_id}",
+                            patient_id=patient.patient_id,
+                            resource_type="patient",
+                            resource_id=patient.patient_id,
+                            success=True
+                        )
+                    else:
+                        self.log(f"⚠ Paziente già esistente nel database o errore nel salvataggio")
+                except Exception as e:
+                    self.log(f"❌ Errore salvando paziente nel database: {e}")
+                    messagebox.showwarning(
+                        "Avviso Database",
+                        f"Impossibile salvare nel database MongoDB:\n{e}\n\nI dati sono comunque disponibili per l'elaborazione."
+                    )
+            
             if file_path:
                 # If exported to file, load that folder
                 folder_path = Path(file_path).parent
@@ -869,6 +926,58 @@ nella directory del progetto.
         
         # Open form dialog
         form = PatientFormDialog(self.root, callback=on_patient_saved)
+    
+    def convert_form_data_to_patient(self, patient_data):
+        """
+        Convert form data dictionary to Patient object.
+        
+        Args:
+            patient_data: Dictionary with patient data from form
+            
+        Returns:
+            Patient object
+        """
+        # Parse date of birth
+        dob_str = patient_data.get('date_of_birth', '')
+        try:
+            # Try format YYYY-MM-DD
+            if '-' in dob_str:
+                dob = datetime.strptime(dob_str, '%Y-%m-%d')
+            # Try format DD/MM/YYYY
+            elif '/' in dob_str:
+                dob = datetime.strptime(dob_str, '%d/%m/%Y')
+            else:
+                dob = datetime.now()
+        except:
+            dob = datetime.now()
+        
+        # Map gender
+        gender_map = {
+            'M': Gender.MALE,
+            'F': Gender.FEMALE,
+            'Altro': Gender.OTHER
+        }
+        gender = gender_map.get(patient_data.get('gender', 'M'), Gender.UNKNOWN)
+        
+        # Create Patient object
+        patient = Patient(
+            patient_id=patient_data.get('patient_id', ''),
+            date_of_birth=dob,
+            gender=gender,
+            medical_record_number=patient_data.get('medical_record_number', ''),
+            age=None,  # Will be calculated
+            ethnicity=None,
+            primary_language='it',
+            chief_complaint=patient_data.get('chief_complaint', ''),
+            medical_history=patient_data.get('medical_history', []),
+            current_medications=patient_data.get('medications', []),
+            allergies=patient_data.get('allergies', [])
+        )
+        
+        # Calculate age
+        patient.calculate_age()
+        
+        return patient
     
     def display_manual_patient_info(self, patient_data):
         """Display manually entered patient information."""

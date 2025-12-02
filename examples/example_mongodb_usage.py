@@ -9,7 +9,7 @@ This script shows how to:
 5. Get database statistics
 
 Requirements:
-- MongoDB server running (default: localhost:27017)
+- MongoDB server running (default: mongodb+srv://angelospeed2003:kjhwoP4rXR3UsnaV@mav.0zz64yh.mongodb.net/)
 - pymongo installed: pip install pymongo
 """
 
@@ -25,7 +25,7 @@ def main():
     # 1. Initialize MongoDB repository
     print("Connecting to MongoDB...")
     db = MongoDBPatientRepository(
-        connection_string="mongodb://localhost:27017/",
+        connection_string="mongodb+srv://angelospeed2003:kjhwoP4rXR3UsnaV@mav.0zz64yh.mongodb.net/",
         database_name="earlycare"
     )
     

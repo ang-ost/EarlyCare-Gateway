@@ -21,7 +21,7 @@ La configurazione di MongoDB si trova in `config/gateway_config.yaml`:
 database:
   mongodb:
     enabled: true
-    connection_string: "mongodb://localhost:27017/"
+    connection_string: "mongodb+srv://angelospeed2003:kjhwoP4rXR3UsnaV@mav.0zz64yh.mongodb.net/"
     database_name: "earlycare"
 ```
 
@@ -33,7 +33,7 @@ Se il tuo server MongoDB richiede autenticazione:
 database:
   mongodb:
     enabled: true
-    connection_string: "mongodb://username:password@localhost:27017/"
+    connection_string: "mongodb+srv://angelospeed2003:kjhwoP4rXR3UsnaV@mav.0zz64yh.mongodb.net/"
     database_name: "earlycare"
     authentication_database: "admin"
 ```
@@ -90,7 +90,7 @@ from src.database.mongodb_repository import MongoDBPatientRepository
 
 # Connessione al database
 db = MongoDBPatientRepository(
-    connection_string="mongodb://localhost:27017/",
+    connection_string="mongodb+srv://angelospeed2003:kjhwoP4rXR3UsnaV@mav.0zz64yh.mongodb.net/",
     database_name="earlycare"
 )
 ```
@@ -278,7 +278,7 @@ sudo systemctl start mongod
 
 Verifica le credenziali nel connection string:
 ```
-mongodb://username:password@localhost:27017/
+mongodb+srv://angelospeed2003:kjhwoP4rXR3UsnaV@mav.0zz64yh.mongodb.net/
 ```
 
 ### Indici mancanti
