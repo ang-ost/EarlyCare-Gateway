@@ -866,14 +866,6 @@ nella directory del progetto.
                 # If not exported, just display the info
                 self.display_manual_patient_info(patient_data)
                 self.status_var.set(f"Dati paziente inseriti: {patient_data['patient_id']}")
-                
-                messagebox.showinfo(
-                    "Informazione",
-                    "Dati paziente inseriti.\n\n"
-                    "Per procedere con la diagnosi, aggiungi:\n"
-                    "• File clinici (note, segnali, immagini)\n"
-                    "• Oppure seleziona una cartella clinica esistente"
-                )
         
         # Open form dialog
         form = PatientFormDialog(self.root, callback=on_patient_saved)

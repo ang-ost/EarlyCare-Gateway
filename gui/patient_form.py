@@ -603,7 +603,6 @@ class PatientFormDialog:
                 with open(file_path, 'w', encoding='utf-8') as f:
                     json.dump(data, f, indent=2, ensure_ascii=False)
                 
-                messagebox.showinfo("Successo", f"Dati paziente salvati in:\n{file_path}")
                 self.result = data
                 
                 # Call callback if provided
