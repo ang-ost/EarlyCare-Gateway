@@ -62,9 +62,6 @@ class MongoDBPatientRepository:
             # Collections
             self.patients_collection = self.db['patients']
             self.patient_records_collection = self.db['patient_records']
-            self.clinical_data_collection = self.db['clinical_data']
-            self.decision_support_collection = self.db['decision_support']
-            self.audit_logs_collection = self.db['audit_logs']
             
             # Initialize collections with schemas
             self._initialize_collections()
@@ -129,10 +126,8 @@ class MongoDBPatientRepository:
             "age": patient.age,
             "ethnicity": patient.ethnicity,
             "primary_language": patient.primary_language,
-            "chief_complaint": patient.chief_complaint,
             "medical_history": patient.medical_history,
-            "current_medications": patient.current_medications,
-            "allergies": patient.allergies,
+            "allergies_and_diseases": patient.allergies_and_diseases,
             "created_at": datetime.now(),
             "updated_at": datetime.now()
         }
@@ -147,26 +142,26 @@ class MongoDBPatientRepository:
             age=data.get("age"),
             ethnicity=data.get("ethnicity"),
             primary_language=data.get("primary_language", "en"),
-            chief_complaint=data.get("chief_complaint"),
             medical_history=data.get("medical_history", []),
-            current_medications=data.get("current_medications", []),
-            allergies=data.get("allergies", [])
+            allergies_and_diseases=data.get("allergies_and_diseases", [])
         )
     
     def _patient_record_to_dict(self, record: PatientRecord) -> Dict[str, Any]:
         """Convert PatientRecord object to dictionary for MongoDB."""
-        # Save clinical data separately and store references
-        clinical_data_refs = []
+        # Convert clinical data to embedded documents
+        clinical_data_embedded = []
         for data in record.clinical_data:
-            data_id = self._save_clinical_data(data)
-            if data_id:
-                clinical_data_refs.append(data_id)
+            data_dict = self._clinical_data_to_dict(data)
+            if data_dict:
+                clinical_data_embedded.append(data_dict)
         
         return {
             "encounter_id": record.encounter_id,
             "patient_id": record.patient.patient_id,
             "patient": self._patient_to_dict(record.patient),
-            "clinical_data_refs": clinical_data_refs,
+            "chief_complaint": record.chief_complaint,
+            "current_medications": record.current_medications,
+            "clinical_data": clinical_data_embedded,
             "encounter_timestamp": record.encounter_timestamp,
             "priority": record.priority,
             "metadata": record.metadata,
@@ -174,15 +169,15 @@ class MongoDBPatientRepository:
             "created_at": datetime.now()
         }
     
-    def _save_clinical_data(self, clinical_data) -> Optional[str]:
+    def _clinical_data_to_dict(self, clinical_data) -> Optional[Dict[str, Any]]:
         """
-        Save clinical data to the clinical_data collection.
+        Convert clinical data to dictionary for embedding in patient_records.
         
         Args:
             clinical_data: ClinicalData object (TextData, SignalData, or ImageData)
             
         Returns:
-            data_id if saved successfully, None otherwise
+            Dictionary representation of clinical data
         """
         try:
             data_dict = {
@@ -193,8 +188,7 @@ class MongoDBPatientRepository:
                 "data_type": clinical_data.data_type.value,
                 "quality_score": clinical_data.quality_score,
                 "is_validated": clinical_data.is_validated,
-                "metadata": clinical_data.metadata,
-                "created_at": datetime.now()
+                "metadata": clinical_data.metadata
             }
             
             # Add type-specific fields
@@ -226,16 +220,9 @@ class MongoDBPatientRepository:
                     "contrast_used": clinical_data.contrast_used
                 })
             
-            # Insert or update
-            self.clinical_data_collection.update_one(
-                {"data_id": clinical_data.data_id},
-                {"$set": data_dict},
-                upsert=True
-            )
-            
-            return clinical_data.data_id
+            return data_dict
         except Exception as e:
-            logger.error(f"Error saving clinical data: {e}")
+            logger.error(f"Error converting clinical data: {e}")
             return None
     
     # Patient CRUD operations

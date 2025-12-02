@@ -28,10 +28,8 @@ class Patient:
     primary_language: Optional[str] = "en"
     
     # Clinical context
-    chief_complaint: Optional[str] = None
     medical_history: List[str] = field(default_factory=list)
-    current_medications: List[str] = field(default_factory=list)
-    allergies: List[str] = field(default_factory=list)
+    allergies_and_diseases: List[str] = field(default_factory=list)
     
     def calculate_age(self) -> int:
         """Calculate patient age."""
@@ -52,10 +50,8 @@ class Patient:
             age=self.age,
             ethnicity=self.ethnicity,
             primary_language=self.primary_language,
-            chief_complaint=self.chief_complaint,
             medical_history=self.medical_history.copy(),
-            current_medications=self.current_medications.copy(),
-            allergies=self.allergies.copy()
+            allergies_and_diseases=self.allergies_and_diseases.copy()
         )
 
 
@@ -68,6 +64,10 @@ class PatientRecord:
     encounter_timestamp: datetime = field(default_factory=datetime.now)
     priority: str = "routine"  # routine, urgent, emergency
     metadata: Dict[str, Any] = field(default_factory=dict)
+    
+    # Encounter-specific fields (moved from Patient)
+    chief_complaint: Optional[str] = None
+    current_medications: List[str] = field(default_factory=list)
     
     def add_clinical_data(self, data: Any) -> None:
         """Add clinical data to patient record."""

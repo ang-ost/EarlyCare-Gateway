@@ -58,10 +58,6 @@ class MongoDBSchemas:
                         "bsonType": "string",
                         "description": "Primary language code (default: 'en')"
                     },
-                    "chief_complaint": {
-                        "bsonType": ["string", "null"],
-                        "description": "Primary reason for visit/consultation"
-                    },
                     "medical_history": {
                         "bsonType": "array",
                         "items": {
@@ -69,19 +65,12 @@ class MongoDBSchemas:
                         },
                         "description": "List of previous medical conditions"
                     },
-                    "current_medications": {
+                    "allergies_and_diseases": {
                         "bsonType": "array",
                         "items": {
                             "bsonType": "string"
                         },
-                        "description": "Current medications list"
-                    },
-                    "allergies": {
-                        "bsonType": "array",
-                        "items": {
-                            "bsonType": "string"
-                        },
-                        "description": "Known allergies"
+                        "description": "Allergie e Malattie"
                     },
                     "created_at": {
                         "bsonType": "date",
@@ -248,18 +237,51 @@ class MongoDBSchemas:
                             "age": {"bsonType": ["int", "null"]},
                             "ethnicity": {"bsonType": ["string", "null"]},
                             "primary_language": {"bsonType": "string"},
-                            "chief_complaint": {"bsonType": ["string", "null"]},
                             "medical_history": {"bsonType": "array"},
-                            "current_medications": {"bsonType": "array"},
-                            "allergies": {"bsonType": "array"}
+                            "allergies_and_diseases": {"bsonType": "array"}
                         }
                     },
-                    "clinical_data_refs": {
+                    "chief_complaint": {
+                        "bsonType": ["string", "null"],
+                        "description": "Primary reason for this visit/consultation"
+                    },
+                    "current_medications": {
                         "bsonType": "array",
                         "items": {
                             "bsonType": "string"
                         },
-                        "description": "Array of clinical_data IDs (references)"
+                        "description": "Current medications at time of visit"
+                    },
+                    "clinical_data": {
+                        "bsonType": "array",
+                        "items": {
+                            "bsonType": "object",
+                            "properties": {
+                                "data_id": {"bsonType": "string"},
+                                "patient_id": {"bsonType": "string"},
+                                "timestamp": {"bsonType": "date"},
+                                "source": {"enum": ["electronic_health_record", "laboratory", "imaging", "wearable_device", "manual_entry"]},
+                                "data_type": {"enum": ["text", "signal", "image"]},
+                                "text_content": {"bsonType": ["string", "null"]},
+                                "language": {"bsonType": ["string", "null"]},
+                                "document_type": {"bsonType": ["string", "null"]},
+                                "signal_values": {"bsonType": ["array", "null"]},
+                                "sampling_rate": {"bsonType": ["double", "null"]},
+                                "signal_type": {"bsonType": ["string", "null"]},
+                                "units": {"bsonType": ["string", "null"]},
+                                "duration": {"bsonType": ["double", "null"]},
+                                "image_path": {"bsonType": ["string", "null"]},
+                                "image_format": {"bsonType": ["string", "null"]},
+                                "modality": {"bsonType": ["string", "null"]},
+                                "dimensions": {"bsonType": ["object", "null"]},
+                                "body_part": {"bsonType": ["string", "null"]},
+                                "contrast_used": {"bsonType": ["bool", "null"]},
+                                "quality_score": {"bsonType": ["double", "null"]},
+                                "is_validated": {"bsonType": ["bool", "null"]},
+                                "metadata": {"bsonType": ["object", "null"]}
+                            }
+                        },
+                        "description": "Array of embedded clinical data"
                     },
                     "encounter_timestamp": {
                         "bsonType": "date",
@@ -527,16 +549,7 @@ class MongoDBSchemas:
             {"keys": [("medical_record_number", 1)]},
             {"keys": [("date_of_birth", 1)]},
             {"keys": [("created_at", -1)]},
-            {"keys": [("allergies", 1)]},  # For allergy queries
-        ],
-        "clinical_data": [
-            {"keys": [("data_id", 1)], "unique": True},
-            {"keys": [("patient_id", 1)]},
-            {"keys": [("timestamp", -1)]},
-            {"keys": [("data_type", 1)]},
-            {"keys": [("source", 1)]},
-            {"keys": [("patient_id", 1), ("timestamp", -1)]},  # Compound index
-            {"keys": [("quality_score", 1)]},
+            {"keys": [("allergies_and_diseases", 1)]},  # For allergy/disease queries
         ],
         "patient_records": [
             {"keys": [("encounter_id", 1)], "unique": True},
@@ -545,23 +558,6 @@ class MongoDBSchemas:
             {"keys": [("priority", 1)]},
             {"keys": [("patient_id", 1), ("encounter_timestamp", -1)]},  # Compound
             {"keys": [("processing_context.triage.score", -1)]},
-        ],
-        "decision_support": [
-            {"keys": [("request_id", 1)], "unique": True},
-            {"keys": [("patient_id", 1)]},
-            {"keys": [("encounter_id", 1)]},
-            {"keys": [("timestamp", -1)]},
-            {"keys": [("urgency_level", 1)]},
-            {"keys": [("triage_score", -1)]},
-            {"keys": [("patient_id", 1), ("timestamp", -1)]},  # Compound
-        ],
-        "audit_logs": [
-            {"keys": [("event_id", 1)], "unique": True},
-            {"keys": [("timestamp", -1)]},
-            {"keys": [("event_type", 1)]},
-            {"keys": [("user_id", 1)]},
-            {"keys": [("patient_id", 1)]},
-            {"keys": [("timestamp", -1), ("event_type", 1)]},  # Compound
         ]
     }
 
@@ -575,10 +571,7 @@ def get_collection_schemas() -> Dict[str, Any]:
     """
     return {
         "patients": MongoDBSchemas.PATIENTS_SCHEMA,
-        "clinical_data": MongoDBSchemas.CLINICAL_DATA_SCHEMA,
-        "patient_records": MongoDBSchemas.PATIENT_RECORDS_SCHEMA,
-        "decision_support": MongoDBSchemas.DECISION_SUPPORT_SCHEMA,
-        "audit_logs": MongoDBSchemas.AUDIT_LOG_SCHEMA
+        "patient_records": MongoDBSchemas.PATIENT_RECORDS_SCHEMA
     }
 
 
