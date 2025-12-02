@@ -3,10 +3,15 @@
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from pymongo import MongoClient, ASCENDING, DESCENDING
-from pymongo.errors import DuplicateKeyError, ConnectionFailure
+from pymongo.errors import DuplicateKeyError, ConnectionFailure, CollectionInvalid
 import logging
+import ssl
+import certifi
 
 from ..models.patient import Patient, PatientRecord, Gender
+from ..models.clinical_data import TextData, SignalData, ImageData, DataType, DataSource
+from ..models.decision import DecisionSupport
+from .schemas import get_collection_schemas, get_indexes
 
 
 logger = logging.getLogger(__name__)
@@ -15,21 +20,54 @@ logger = logging.getLogger(__name__)
 class MongoDBPatientRepository:
     """Repository for managing patient data in MongoDB."""
     
-    def __init__(self, connection_string: str, database_name: str = "earlycare"):
+    def __init__(self, connection_string: str, database_name: str = "earlycare", **kwargs):
         """
         Initialize MongoDB repository.
         
         Args:
-            connection_string: MongoDB connection string (e.g., 'mongodb://localhost:27017/')
+            connection_string: MongoDB connection string
             database_name: Name of the database to use
+            **kwargs: Additional connection parameters (tlsAllowInvalidCertificates, etc.)
         """
         try:
-            self.client = MongoClient(connection_string)
+            # Default connection parameters for MongoDB Atlas
+            connection_params = {
+                'serverSelectionTimeoutMS': 10000,
+                'connectTimeoutMS': 20000,
+                'socketTimeoutMS': 20000,
+            }
+            
+            # If using mongodb+srv (Atlas), add SSL/TLS parameters
+            if 'mongodb+srv://' in connection_string or 'ssl=true' in connection_string.lower():
+                # WORKAROUND for Python 3.14 SSL issues - disable strict verification
+                connection_params.update({
+                    'tls': True,
+                    'tlsAllowInvalidCertificates': True,  # Disable certificate validation
+                    'tlsAllowInvalidHostnames': True,      # Disable hostname validation
+                })
+                logger.warning("⚠️  Using relaxed SSL verification - NOT RECOMMENDED for production!")
+                logger.warning("⚠️  Consider using Python 3.12 for proper SSL support")
+            
+            # Merge with user-provided kwargs (allows override)
+            connection_params.update(kwargs)
+            
+            logger.info("Attempting MongoDB connection...")
+            self.client = MongoClient(connection_string, **connection_params)
             self.db = self.client[database_name]
+            
+            # Test connection
+            self.client.admin.command('ping')
+            logger.info("✓ MongoDB connection successful")
             
             # Collections
             self.patients_collection = self.db['patients']
             self.patient_records_collection = self.db['patient_records']
+            self.clinical_data_collection = self.db['clinical_data']
+            self.decision_support_collection = self.db['decision_support']
+            self.audit_logs_collection = self.db['audit_logs']
+            
+            # Initialize collections with schemas
+            self._initialize_collections()
             
             # Create indexes
             self._create_indexes()
@@ -39,18 +77,47 @@ class MongoDBPatientRepository:
             logger.error(f"Failed to connect to MongoDB: {e}")
             raise
     
+    def _initialize_collections(self):
+        """Initialize collections with schema validation."""
+        schemas = get_collection_schemas()
+        
+        for collection_name, schema in schemas.items():
+            try:
+                # Check if collection exists
+                if collection_name not in self.db.list_collection_names():
+                    # Create collection with schema validation
+                    self.db.create_collection(collection_name, **schema)
+                    logger.info(f"Created collection '{collection_name}' with schema validation")
+                else:
+                    # Update validation rules for existing collection
+                    try:
+                        self.db.command({
+                            "collMod": collection_name,
+                            "validator": schema["validator"],
+                            "validationLevel": schema.get("validationLevel", "moderate"),
+                            "validationAction": schema.get("validationAction", "warn")
+                        })
+                        logger.info(f"Updated schema validation for collection '{collection_name}'")
+                    except Exception as e:
+                        logger.warning(f"Could not update validation for '{collection_name}': {e}")
+            except CollectionInvalid:
+                logger.debug(f"Collection '{collection_name}' already exists")
+            except Exception as e:
+                logger.warning(f"Error initializing collection '{collection_name}': {e}")
+    
     def _create_indexes(self):
         """Create indexes for better query performance."""
-        # Patient indexes
-        self.patients_collection.create_index([("patient_id", ASCENDING)], unique=True)
-        self.patients_collection.create_index([("medical_record_number", ASCENDING)])
-        self.patients_collection.create_index([("date_of_birth", ASCENDING)])
+        indexes_def = get_indexes()
         
-        # Patient records indexes
-        self.patient_records_collection.create_index([("encounter_id", ASCENDING)], unique=True)
-        self.patient_records_collection.create_index([("patient.patient_id", ASCENDING)])
-        self.patient_records_collection.create_index([("encounter_timestamp", DESCENDING)])
-        self.patient_records_collection.create_index([("priority", ASCENDING)])
+        for collection_name, indexes in indexes_def.items():
+            collection = self.db[collection_name]
+            for index_spec in indexes:
+                try:
+                    keys = index_spec["keys"]
+                    unique = index_spec.get("unique", False)
+                    collection.create_index(keys, unique=unique)
+                except Exception as e:
+                    logger.warning(f"Could not create index on {collection_name}: {e}")
     
     def _patient_to_dict(self, patient: Patient) -> Dict[str, Any]:
         """Convert Patient object to dictionary for MongoDB."""
@@ -88,26 +155,88 @@ class MongoDBPatientRepository:
     
     def _patient_record_to_dict(self, record: PatientRecord) -> Dict[str, Any]:
         """Convert PatientRecord object to dictionary for MongoDB."""
+        # Save clinical data separately and store references
+        clinical_data_refs = []
+        for data in record.clinical_data:
+            data_id = self._save_clinical_data(data)
+            if data_id:
+                clinical_data_refs.append(data_id)
+        
         return {
             "encounter_id": record.encounter_id,
+            "patient_id": record.patient.patient_id,
             "patient": self._patient_to_dict(record.patient),
-            "clinical_data": [
-                {
-                    "data_type": data.data_type.value,
-                    "timestamp": data.timestamp,
-                    "values": data.values,
-                    "unit": data.unit,
-                    "source": data.source,
-                    "quality_score": data.quality_score,
-                    "metadata": data.metadata
-                }
-                for data in record.clinical_data
-            ],
+            "clinical_data_refs": clinical_data_refs,
             "encounter_timestamp": record.encounter_timestamp,
             "priority": record.priority,
             "metadata": record.metadata,
+            "processing_context": record.metadata.get("processing_context", {}),
             "created_at": datetime.now()
         }
+    
+    def _save_clinical_data(self, clinical_data) -> Optional[str]:
+        """
+        Save clinical data to the clinical_data collection.
+        
+        Args:
+            clinical_data: ClinicalData object (TextData, SignalData, or ImageData)
+            
+        Returns:
+            data_id if saved successfully, None otherwise
+        """
+        try:
+            data_dict = {
+                "data_id": clinical_data.data_id,
+                "patient_id": clinical_data.patient_id,
+                "timestamp": clinical_data.timestamp,
+                "source": clinical_data.source.value,
+                "data_type": clinical_data.data_type.value,
+                "quality_score": clinical_data.quality_score,
+                "is_validated": clinical_data.is_validated,
+                "metadata": clinical_data.metadata,
+                "created_at": datetime.now()
+            }
+            
+            # Add type-specific fields
+            if isinstance(clinical_data, TextData):
+                data_dict.update({
+                    "text_content": clinical_data.text_content,
+                    "language": clinical_data.language,
+                    "document_type": clinical_data.document_type
+                })
+            elif isinstance(clinical_data, SignalData):
+                data_dict.update({
+                    "signal_values": clinical_data.signal_values,
+                    "sampling_rate": clinical_data.sampling_rate,
+                    "signal_type": clinical_data.signal_type,
+                    "units": clinical_data.units,
+                    "duration": clinical_data.duration
+                })
+            elif isinstance(clinical_data, ImageData):
+                data_dict.update({
+                    "image_path": clinical_data.image_path,
+                    "image_format": clinical_data.image_format,
+                    "modality": clinical_data.modality,
+                    "dimensions": {
+                        "width": clinical_data.dimensions[0] if len(clinical_data.dimensions) > 0 else 0,
+                        "height": clinical_data.dimensions[1] if len(clinical_data.dimensions) > 1 else 0,
+                        "depth": clinical_data.dimensions[2] if len(clinical_data.dimensions) > 2 else 0
+                    },
+                    "body_part": clinical_data.body_part,
+                    "contrast_used": clinical_data.contrast_used
+                })
+            
+            # Insert or update
+            self.clinical_data_collection.update_one(
+                {"data_id": clinical_data.data_id},
+                {"$set": data_dict},
+                upsert=True
+            )
+            
+            return clinical_data.data_id
+        except Exception as e:
+            logger.error(f"Error saving clinical data: {e}")
+            return None
     
     # Patient CRUD operations
     
@@ -331,15 +460,307 @@ class MongoDBPatientRepository:
             return {
                 "total_patients": self.patients_collection.count_documents({}),
                 "total_records": self.patient_records_collection.count_documents({}),
+                "total_clinical_data": self.clinical_data_collection.count_documents({}),
+                "total_decisions": self.decision_support_collection.count_documents({}),
                 "priority_counts": {
                     "emergency": self.patient_records_collection.count_documents({"priority": "emergency"}),
                     "urgent": self.patient_records_collection.count_documents({"priority": "urgent"}),
+                    "soon": self.patient_records_collection.count_documents({"priority": "soon"}),
                     "routine": self.patient_records_collection.count_documents({"priority": "routine"})
+                },
+                "data_type_counts": {
+                    "text": self.clinical_data_collection.count_documents({"data_type": "text"}),
+                    "signal": self.clinical_data_collection.count_documents({"data_type": "signal"}),
+                    "image": self.clinical_data_collection.count_documents({"data_type": "image"})
                 }
             }
         except Exception as e:
             logger.error(f"Error getting statistics: {e}")
             return {}
+    
+    # Clinical Data operations
+    
+    def get_clinical_data(self, data_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve clinical data by ID.
+        
+        Args:
+            data_id: Clinical data identifier
+            
+        Returns:
+            Clinical data dictionary or None if not found
+        """
+        try:
+            return self.clinical_data_collection.find_one({"data_id": data_id})
+        except Exception as e:
+            logger.error(f"Error retrieving clinical data: {e}")
+            return None
+    
+    def get_patient_clinical_data(
+        self, 
+        patient_id: str, 
+        data_type: Optional[str] = None,
+        limit: int = 50
+    ) -> List[Dict[str, Any]]:
+        """
+        Get all clinical data for a patient.
+        
+        Args:
+            patient_id: Patient identifier
+            data_type: Optional filter by data type (text, signal, image)
+            limit: Maximum number of records to return
+            
+        Returns:
+            List of clinical data dictionaries
+        """
+        try:
+            query = {"patient_id": patient_id}
+            if data_type:
+                query["data_type"] = data_type
+            
+            cursor = self.clinical_data_collection.find(query).sort(
+                "timestamp", DESCENDING
+            ).limit(limit)
+            
+            return list(cursor)
+        except Exception as e:
+            logger.error(f"Error retrieving patient clinical data: {e}")
+            return []
+    
+    def delete_clinical_data(self, data_id: str) -> bool:
+        """
+        Delete clinical data.
+        
+        Args:
+            data_id: Clinical data identifier
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            result = self.clinical_data_collection.delete_one({"data_id": data_id})
+            if result.deleted_count > 0:
+                logger.info(f"Deleted clinical data: {data_id}")
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Error deleting clinical data: {e}")
+            return False
+    
+    # Decision Support operations
+    
+    def save_decision_support(self, decision: DecisionSupport, encounter_id: str) -> bool:
+        """
+        Save decision support results.
+        
+        Args:
+            decision: DecisionSupport object
+            encounter_id: Associated encounter ID
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            decision_dict = {
+                "request_id": decision.request_id,
+                "patient_id": decision.patient_id,
+                "encounter_id": encounter_id,
+                "timestamp": decision.timestamp,
+                "diagnoses": [
+                    {
+                        "condition": d.condition,
+                        "icd_code": d.icd_code,
+                        "confidence_score": d.confidence_score,
+                        "confidence_level": d.confidence_level.value,
+                        "evidence": d.evidence,
+                        "risk_factors": d.risk_factors,
+                        "differential_diagnoses": d.differential_diagnoses,
+                        "recommended_tests": d.recommended_tests,
+                        "recommended_specialists": d.recommended_specialists
+                    }
+                    for d in decision.diagnoses
+                ],
+                "urgency_level": decision.urgency_level.value,
+                "triage_score": decision.triage_score,
+                "alerts": decision.alerts,
+                "warnings": decision.warnings,
+                "clinical_notes": decision.clinical_notes,
+                "models_used": decision.models_used,
+                "processing_time_ms": decision.processing_time_ms,
+                "explanation": decision.explanation,
+                "feature_importance": decision.feature_importance,
+                "metadata": decision.metadata,
+                "created_at": datetime.now()
+            }
+            
+            self.decision_support_collection.insert_one(decision_dict)
+            logger.info(f"Saved decision support: {decision.request_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Error saving decision support: {e}")
+            return False
+    
+    def get_decision_support(self, request_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve decision support by request ID.
+        
+        Args:
+            request_id: Request identifier
+            
+        Returns:
+            Decision support dictionary or None if not found
+        """
+        try:
+            return self.decision_support_collection.find_one({"request_id": request_id})
+        except Exception as e:
+            logger.error(f"Error retrieving decision support: {e}")
+            return None
+    
+    def get_patient_decisions(self, patient_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Get decision support results for a patient.
+        
+        Args:
+            patient_id: Patient identifier
+            limit: Maximum number of records to return
+            
+        Returns:
+            List of decision support dictionaries
+        """
+        try:
+            cursor = self.decision_support_collection.find(
+                {"patient_id": patient_id}
+            ).sort("timestamp", DESCENDING).limit(limit)
+            
+            return list(cursor)
+        except Exception as e:
+            logger.error(f"Error retrieving patient decisions: {e}")
+            return []
+    
+    def get_decisions_by_urgency(self, urgency_level: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Find decision support results by urgency level.
+        
+        Args:
+            urgency_level: Urgency level (routine, soon, urgent, emergency)
+            limit: Maximum number of records to return
+            
+        Returns:
+            List of decision support dictionaries
+        """
+        try:
+            cursor = self.decision_support_collection.find(
+                {"urgency_level": urgency_level}
+            ).sort("timestamp", DESCENDING).limit(limit)
+            
+            return list(cursor)
+        except Exception as e:
+            logger.error(f"Error finding decisions by urgency: {e}")
+            return []
+    
+    # Audit logging
+    
+    def log_audit_event(
+        self,
+        event_type: str,
+        user_id: str,
+        action: str,
+        patient_id: Optional[str] = None,
+        resource_type: Optional[str] = None,
+        resource_id: Optional[str] = None,
+        success: bool = True,
+        error_message: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> bool:
+        """
+        Log an audit event.
+        
+        Args:
+            event_type: Type of event (access, create, update, delete, etc.)
+            user_id: User performing the action
+            action: Description of the action
+            patient_id: Optional patient ID
+            resource_type: Type of resource affected
+            resource_id: ID of affected resource
+            success: Whether the action succeeded
+            error_message: Error message if failed
+            metadata: Additional metadata
+            
+        Returns:
+            True if logged successfully
+        """
+        try:
+            event_id = f"AUD-{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+            
+            audit_dict = {
+                "event_id": event_id,
+                "timestamp": datetime.now(),
+                "event_type": event_type,
+                "user_id": user_id,
+                "patient_id": patient_id,
+                "resource_type": resource_type,
+                "resource_id": resource_id,
+                "action": action,
+                "success": success,
+                "error_message": error_message,
+                "metadata": metadata or {}
+            }
+            
+            self.audit_logs_collection.insert_one(audit_dict)
+            return True
+        except Exception as e:
+            logger.error(f"Error logging audit event: {e}")
+            return False
+    
+    def get_audit_logs(
+        self,
+        patient_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        event_type: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        limit: int = 100
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieve audit logs with optional filters.
+        
+        Args:
+            patient_id: Filter by patient ID
+            user_id: Filter by user ID
+            event_type: Filter by event type
+            start_date: Filter by start date
+            end_date: Filter by end date
+            limit: Maximum number of records
+            
+        Returns:
+            List of audit log dictionaries
+        """
+        try:
+            query = {}
+            
+            if patient_id:
+                query["patient_id"] = patient_id
+            if user_id:
+                query["user_id"] = user_id
+            if event_type:
+                query["event_type"] = event_type
+            
+            if start_date or end_date:
+                date_query = {}
+                if start_date:
+                    date_query["$gte"] = start_date
+                if end_date:
+                    date_query["$lte"] = end_date
+                query["timestamp"] = date_query
+            
+            cursor = self.audit_logs_collection.find(query).sort(
+                "timestamp", DESCENDING
+            ).limit(limit)
+            
+            return list(cursor)
+        except Exception as e:
+            logger.error(f"Error retrieving audit logs: {e}")
+            return []
     
     def close(self):
         """Close MongoDB connection."""

@@ -58,7 +58,30 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Initialize MongoDB database (optional, for persistence)
+python scripts/initialize_database.py
 ```
+
+### MongoDB Setup (Optional)
+
+Per abilitare la persistenza dei dati con MongoDB:
+
+1. **Installa MongoDB**: https://www.mongodb.com/try/download/community
+2. **Avvia MongoDB**: 
+   ```bash
+   # Windows
+   net start MongoDB
+   
+   # Linux/Mac
+   sudo systemctl start mongod
+   ```
+3. **Inizializza il database**:
+   ```bash
+   python scripts/initialize_database.py
+   ```
+
+Consulta [MONGODB_SETUP.md](MONGODB_SETUP.md) e [MONGODB_SCHEMAS.md](MONGODB_SCHEMAS.md) per dettagli completi.
 
 ### Basic Usage
 
