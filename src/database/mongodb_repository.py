@@ -146,16 +146,24 @@ class MongoDBPatientRepository:
     def _dict_to_patient(self, data: Dict[str, Any]) -> Patient:
         """Convert MongoDB dictionary to Patient object."""
         try:
+            # Handle both old and new schema
+            # Old schema used: date_of_birth, allergies, medical_history
+            # New schema uses: data_nascita, allergie, malattie_permanenti, nome, cognome, comune_nascita
+            
+            data_nascita = data.get("data_nascita") or data.get("date_of_birth") or datetime.now()
+            allergie = data.get("allergie") or data.get("allergies") or []
+            malattie = data.get("malattie_permanenti") or data.get("medical_history") or []
+            
             return Patient(
                 patient_id=data.get("patient_id", data.get("codice_fiscale", "")),
                 nome=data.get("nome", ""),
                 cognome=data.get("cognome", ""),
-                data_nascita=data.get("data_nascita", datetime.now()),
+                data_nascita=data_nascita,
                 comune_nascita=data.get("comune_nascita", ""),
                 codice_fiscale=data.get("codice_fiscale", ""),
                 data_decesso=data.get("data_decesso"),
-                allergie=data.get("allergie", []),
-                malattie_permanenti=data.get("malattie_permanenti", []),
+                allergie=allergie,
+                malattie_permanenti=malattie,
                 gender=Gender(data["gender"]) if "gender" in data else None,
                 medical_record_number=data.get("medical_record_number", ""),
                 age=data.get("age"),

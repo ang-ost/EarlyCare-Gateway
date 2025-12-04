@@ -1816,6 +1816,24 @@ Storia Clinica:
                 self.log(f"❌ Paziente non trovato: {fiscal_code}")
                 return
             
+            # DEBUG: Check what was retrieved
+            self.log(f"=== DEBUG SEARCH RESULT ===")
+            self.log(f"Search.nome: '{patient.nome}'")
+            self.log(f"Search.cognome: '{patient.cognome}'")
+            self.log(f"Search.codice_fiscale: '{patient.codice_fiscale}'")
+            self.log(f"Search.comune_nascita: '{patient.comune_nascita}'")
+            self.log(f"Search.data_nascita: {patient.data_nascita}")
+            
+            # If patient has empty critical fields, it means database has corrupted data
+            if not patient.nome or not patient.cognome:
+                self.log(f"⚠️ ERRORE: Paziente nel database ha campi vuoti!")
+                messagebox.showerror(
+                    "Dati Corrotti",
+                    f"Il paziente {fiscal_code} è presente nel database ma ha dati incompleti.\n\n"
+                    "Per favore, inserisci nuovamente i dati del paziente usando il form."
+                )
+                return
+            
             # Get all patient records
             records = self.db.get_patient_records(fiscal_code, limit=1000)
             
@@ -1858,44 +1876,33 @@ Storia Clinica:
             'unknown': 'Non specificato'
         }
         
-        patient_info = f"""╔{'═'*58}╗
-║  👤 AREA RISERVATA PAZIENTE                              ║
-╚{'═'*58}╝
-
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃  NOME E COGNOME:    {patient.nome} {patient.cognome}
-┃  CODICE FISCALE:    {patient.codice_fiscale}
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
-
-{'─'*60}
-📋 DATI ANAGRAFICI
-{'─'*60}
-
-Data di Nascita:    {patient.data_nascita.strftime('%d/%m/%Y') if patient.data_nascita else 'N/A'}
-Comune di Nascita:  {patient.comune_nascita}
-Età:                {patient.age if patient.age else 'N/A'} anni
+        # Simple list format without decorative elements
+        patient_info = f"""Nome: {patient.nome}
+Cognome: {patient.cognome}
+Codice Fiscale: {patient.codice_fiscale}
+Data di Nascita: {patient.data_nascita.strftime('%d/%m/%Y') if patient.data_nascita else 'N/A'}
+Comune di Nascita: {patient.comune_nascita}
+Età: {patient.age if patient.age else 'N/A'} anni
 """
         
         if patient.data_decesso:
-            patient_info += f"Data Decesso:       {patient.data_decesso.strftime('%d/%m/%Y')}\n"
+            patient_info += f"Data Decesso: {patient.data_decesso.strftime('%d/%m/%Y')}\n"
         
         if patient.gender:
             gender_it = gender_translation.get(patient.gender.value.lower(), patient.gender.value)
-            patient_info += f"Sesso:              {gender_it}\n"
+            patient_info += f"Sesso: {gender_it}\n"
         
-        patient_info += f"\n{'─'*60}\n"
-        patient_info += "🔴 ALLERGIE:\n"
+        patient_info += f"\nAllergie:\n"
         if patient.allergie and len(patient.allergie) > 0:
             for allergia in patient.allergie:
-                patient_info += f"  • {allergia}\n"
+                patient_info += f"  - {allergia}\n"
         else:
             patient_info += "  Nessuna allergia registrata\n"
         
-        patient_info += f"\n{'─'*60}\n"
-        patient_info += "🏥 MALATTIE PERMANENTI:\n"
+        patient_info += f"\nMalattie Permanenti:\n"
         if patient.malattie_permanenti and len(patient.malattie_permanenti) > 0:
             for malattia in patient.malattie_permanenti:
-                patient_info += f"  • {malattia}\n"
+                patient_info += f"  - {malattia}\n"
         else:
             patient_info += "  Nessuna malattia permanente registrata\n"
         
