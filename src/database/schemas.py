@@ -278,7 +278,7 @@ class MongoDBSchemas:
     INDEXES = {
         "patients": [
             {"keys": [("patient_id", 1)], "unique": True},
-            {"keys": [("codice_fiscale", 1)], "unique": True},
+            {"keys": [("codice_fiscale", 1)]},  # Non-unique to allow migration
             {"keys": [("medical_record_number", 1)]},
             {"keys": [("data_nascita", 1)]},
             {"keys": [("created_at", -1)]},
