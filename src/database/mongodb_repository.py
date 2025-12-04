@@ -118,32 +118,48 @@ class MongoDBPatientRepository:
     
     def _patient_to_dict(self, patient: Patient) -> Dict[str, Any]:
         """Convert Patient object to dictionary for MongoDB."""
-        return {
+        patient_dict = {
             "patient_id": patient.patient_id,
-            "date_of_birth": patient.date_of_birth,
-            "gender": patient.gender.value,
-            "medical_record_number": patient.medical_record_number,
+            "nome": patient.nome,
+            "cognome": patient.cognome,
+            "data_nascita": patient.data_nascita,
+            "comune_nascita": patient.comune_nascita,
+            "codice_fiscale": patient.codice_fiscale,
+            "data_decesso": patient.data_decesso,
+            "allergie": patient.allergie,
+            "malattie_permanenti": patient.malattie_permanenti,
             "age": patient.age,
             "ethnicity": patient.ethnicity,
             "primary_language": patient.primary_language,
-            "medical_history": patient.medical_history,
-            "allergies_and_diseases": patient.allergies_and_diseases,
             "created_at": datetime.now(),
             "updated_at": datetime.now()
         }
+        
+        # Aggiungi campi opzionali solo se presenti
+        if patient.gender:
+            patient_dict["gender"] = patient.gender.value
+        if patient.medical_record_number:
+            patient_dict["medical_record_number"] = patient.medical_record_number
+            
+        return patient_dict
     
     def _dict_to_patient(self, data: Dict[str, Any]) -> Patient:
         """Convert MongoDB dictionary to Patient object."""
         return Patient(
             patient_id=data["patient_id"],
-            date_of_birth=data["date_of_birth"],
-            gender=Gender(data["gender"]),
-            medical_record_number=data["medical_record_number"],
+            nome=data["nome"],
+            cognome=data["cognome"],
+            data_nascita=data["data_nascita"],
+            comune_nascita=data["comune_nascita"],
+            codice_fiscale=data["codice_fiscale"],
+            data_decesso=data.get("data_decesso"),
+            allergie=data.get("allergie", []),
+            malattie_permanenti=data.get("malattie_permanenti", []),
+            gender=Gender(data["gender"]) if "gender" in data else None,
+            medical_record_number=data.get("medical_record_number"),
             age=data.get("age"),
             ethnicity=data.get("ethnicity"),
-            primary_language=data.get("primary_language", "en"),
-            medical_history=data.get("medical_history", []),
-            allergies_and_diseases=data.get("allergies_and_diseases", [])
+            primary_language=data.get("primary_language", "it")
         )
     
     def _patient_record_to_dict(self, record: PatientRecord) -> Dict[str, Any]:
@@ -158,7 +174,12 @@ class MongoDBPatientRepository:
         return {
             "encounter_id": record.encounter_id,
             "patient_id": record.patient.patient_id,
-            "patient": self._patient_to_dict(record.patient),
+            "patient": {
+                "patient_id": record.patient.patient_id,
+                "nome": record.patient.nome,
+                "cognome": record.patient.cognome,
+                "codice_fiscale": record.patient.codice_fiscale
+            },
             "chief_complaint": record.chief_complaint,
             "current_medications": record.current_medications,
             "clinical_data": clinical_data_embedded,

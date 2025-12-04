@@ -186,6 +186,18 @@ class PatientFormDialog:
         ttk.Label(scrollable_frame, text="(Una per riga)", font=('Segoe UI', 8), foreground='gray').grid(row=row+1, column=1, sticky='w')
         row += 2
         
+        # Malattie Permanenti
+        ttk.Label(scrollable_frame, text="Malattie Permanenti:").grid(row=row, column=0, sticky='nw', pady=5)
+        diseases_frame = ttk.Frame(scrollable_frame)
+        diseases_frame.grid(row=row, column=1, sticky='ew', pady=5)
+        self.diseases_text = tk.Text(diseases_frame, height=3, width=40, wrap='word')
+        self.diseases_text.pack(side='left', fill='both', expand=True)
+        diseases_scroll = ttk.Scrollbar(diseases_frame, command=self.diseases_text.yview)
+        diseases_scroll.pack(side='right', fill='y')
+        self.diseases_text.config(yscrollcommand=diseases_scroll.set)
+        ttk.Label(scrollable_frame, text="(es: diabete, celiachia, malattie cardiovascolari, neurodegenerative - Una per riga)", font=('Segoe UI', 8), foreground='gray').grid(row=row+1, column=1, sticky='w')
+        row += 2
+        
         # ==== PARAMETRI VITALI ====
         
         # Section header
@@ -548,6 +560,7 @@ class PatientFormDialog:
         history = [line.strip() for line in self.history_text.get(1.0, tk.END).split('\n') if line.strip()]
         medications = [line.strip() for line in self.medications_text.get(1.0, tk.END).split('\n') if line.strip()]
         allergies = [line.strip() for line in self.allergies_text.get(1.0, tk.END).split('\n') if line.strip()]
+        diseases = [line.strip() for line in self.diseases_text.get(1.0, tk.END).split('\n') if line.strip()]
         
         # Convert date format from GG/MM/AAAA to AAAA-MM-GG for internal use
         dob_input = self.dob_var.get().strip()
@@ -561,17 +574,18 @@ class PatientFormDialog:
         
         data = {
             "patient_id": fiscal_code,  # Use fiscal code as patient ID
-            "medical_record_number": fiscal_code,  # Use fiscal code as MRN
-            "name": self.name_var.get().strip(),
-            "surname": self.surname_var.get().strip(),
-            "date_of_birth": dob_formatted,
-            "birthplace": self.birthplace_var.get().strip(),
+            "nome": self.name_var.get().strip(),
+            "cognome": self.surname_var.get().strip(),
+            "data_nascita": dob_formatted,
+            "comune_nascita": self.birthplace_var.get().strip(),
+            "codice_fiscale": fiscal_code,
+            "allergie": allergies,
+            "malattie_permanenti": diseases,
             "gender": self.gender_var.get(),
-            "fiscal_code": fiscal_code,
+            "medical_record_number": fiscal_code,  # Use fiscal code as MRN
             "chief_complaint": self.chief_complaint_var.get().strip(),
             "medical_history": history,
             "medications": medications,
-            "allergies": allergies,
             "vital_signs": {
                 "blood_pressure": self.bp_var.get().strip() or None,
                 "heart_rate": self.hr_var.get().strip() or None,

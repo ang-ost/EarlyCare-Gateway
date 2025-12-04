@@ -17,25 +17,31 @@ class Gender(Enum):
 @dataclass
 class Patient:
     """Patient demographic and clinical information."""
+    # Campi obbligatori
     patient_id: str
-    date_of_birth: datetime
-    gender: Gender
-    medical_record_number: str
+    nome: str
+    cognome: str
+    data_nascita: datetime
+    comune_nascita: str
+    codice_fiscale: str
     
-    # Optional fields
+    # Campi opzionali
+    data_decesso: Optional[datetime] = None
+    allergie: List[str] = field(default_factory=list)
+    malattie_permanenti: List[str] = field(default_factory=list)
+    
+    # Altri campi opzionali
+    gender: Optional[Gender] = None
+    medical_record_number: Optional[str] = None
     age: Optional[int] = None
     ethnicity: Optional[str] = None
-    primary_language: Optional[str] = "en"
-    
-    # Clinical context
-    medical_history: List[str] = field(default_factory=list)
-    allergies_and_diseases: List[str] = field(default_factory=list)
+    primary_language: Optional[str] = "it"
     
     def calculate_age(self) -> int:
         """Calculate patient age."""
         today = datetime.now()
-        age = today.year - self.date_of_birth.year
-        if (today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day):
+        age = today.year - self.data_nascita.year
+        if (today.month, today.day) < (self.data_nascita.month, self.data_nascita.day):
             age -= 1
         self.age = age
         return age
@@ -44,14 +50,19 @@ class Patient:
         """Create anonymized patient record."""
         return Patient(
             patient_id="ANONYMIZED",
-            date_of_birth=datetime(self.date_of_birth.year, 1, 1),  # Keep year only
+            nome="ANONYMIZED",
+            cognome="ANONYMIZED",
+            data_nascita=datetime(self.data_nascita.year, 1, 1),  # Keep year only
+            comune_nascita="ANONYMIZED",
+            codice_fiscale="ANONYMIZED",
+            data_decesso=self.data_decesso,
+            allergie=self.allergie.copy(),
+            malattie_permanenti=self.malattie_permanenti.copy(),
             gender=self.gender,
-            medical_record_number="ANONYMIZED",
+            medical_record_number="ANONYMIZED" if self.medical_record_number else None,
             age=self.age,
             ethnicity=self.ethnicity,
-            primary_language=self.primary_language,
-            medical_history=self.medical_history.copy(),
-            allergies_and_diseases=self.allergies_and_diseases.copy()
+            primary_language=self.primary_language
         )
 
 

@@ -1115,7 +1115,7 @@ nella directory del progetto.
             Patient object
         """
         # Parse date of birth
-        dob_str = patient_data.get('date_of_birth', '')
+        dob_str = patient_data.get('data_nascita', patient_data.get('date_of_birth', ''))
         try:
             # Try format YYYY-MM-DD
             if '-' in dob_str:
@@ -1134,19 +1134,24 @@ nella directory del progetto.
             'F': Gender.FEMALE,
             'Altro': Gender.OTHER
         }
-        gender = gender_map.get(patient_data.get('gender', 'M'), Gender.UNKNOWN)
+        gender_value = gender_map.get(patient_data.get('gender', 'M'), Gender.UNKNOWN)
         
-        # Create Patient object
+        # Create Patient object with new fields
         patient = Patient(
             patient_id=patient_data.get('patient_id', ''),
-            date_of_birth=dob,
-            gender=gender,
+            nome=patient_data.get('nome', ''),
+            cognome=patient_data.get('cognome', ''),
+            data_nascita=dob,
+            comune_nascita=patient_data.get('comune_nascita', ''),
+            codice_fiscale=patient_data.get('codice_fiscale', ''),
+            data_decesso=None,  # Optional
+            allergie=patient_data.get('allergie', []),
+            malattie_permanenti=patient_data.get('malattie_permanenti', []),
+            gender=gender_value,
             medical_record_number=patient_data.get('medical_record_number', ''),
             age=None,  # Will be calculated
             ethnicity=None,
-            primary_language='it',
-            medical_history=patient_data.get('medical_history', []),
-            allergies_and_diseases=patient_data.get('allergies', [])
+            primary_language='it'
         )
         
         # Calculate age
@@ -1161,23 +1166,29 @@ nella directory del progetto.
         
         # Format full name
         full_name = ""
-        if patient_data.get('name') and patient_data.get('surname'):
-            full_name = f"{patient_data['name']} {patient_data['surname']}"
-        elif patient_data.get('name'):
-            full_name = patient_data['name']
-        elif patient_data.get('surname'):
-            full_name = patient_data['surname']
+        nome = patient_data.get('nome', patient_data.get('name', ''))
+        cognome = patient_data.get('cognome', patient_data.get('surname', ''))
         
-        info_text = f"""Codice Fiscale: {patient_data.get('fiscal_code', 'N/A')}"""
+        if nome and cognome:
+            full_name = f"{nome} {cognome}"
+        elif nome:
+            full_name = nome
+        elif cognome:
+            full_name = cognome
+        
+        codice_fiscale = patient_data.get('codice_fiscale', patient_data.get('fiscal_code', 'N/A'))
+        info_text = f"""Codice Fiscale: {codice_fiscale}"""
         
         if full_name:
             info_text += f"\nNome: {full_name}"
         
-        if patient_data.get('birthplace'):
-            info_text += f"\nLuogo di Nascita: {patient_data['birthplace']}"
+        comune_nascita = patient_data.get('comune_nascita', patient_data.get('birthplace', ''))
+        if comune_nascita:
+            info_text += f"\nLuogo di Nascita: {comune_nascita}"
         
+        data_nascita = patient_data.get('data_nascita', patient_data.get('date_of_birth', 'N/A'))
         info_text += f"""
-Data di Nascita: {patient_data.get('date_of_birth', 'N/A')}
+Data di Nascita: {data_nascita}
 Sesso: {patient_data.get('gender', 'N/A')}
 Sintomo Principale: {patient_data.get('chief_complaint', 'N/A')}
 
@@ -1190,9 +1201,16 @@ Storia Clinica:
         for m in patient_data.get('medications', []):
             info_text += f"• {m}\n"
         
+        allergie = patient_data.get('allergie', patient_data.get('allergies', []))
         info_text += "\nAllergie:\n"
-        for a in patient_data.get('allergies', []):
+        for a in allergie:
             info_text += f"• {a}\n"
+        
+        malattie = patient_data.get('malattie_permanenti', [])
+        if malattie:
+            info_text += "\nMalattie Permanenti:\n"
+            for m in malattie:
+                info_text += f"• {m}\n"
         
         # Add vital signs if present
         vitals = patient_data.get('vital_signs', {})
