@@ -9,6 +9,7 @@ from pathlib import Path
 import json
 from datetime import datetime
 import sys
+from functools import wraps
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -19,6 +20,7 @@ from src.gateway.folder_processor import ClinicalFolderProcessor
 from src.strategy.strategy_selector import StrategySelector
 from src.observer.metrics_observer import MetricsObserver, AuditObserver
 from src.models.patient import Patient, Gender
+from src.models.doctor import Doctor
 
 # MongoDB integration
 try:
@@ -32,6 +34,12 @@ app = Flask(__name__)
 app.secret_key = Config.FLASK_SECRET_KEY
 app.config['UPLOAD_FOLDER'] = Path(__file__).parent / 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = Config.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+
+# Session configuration
+app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['PERMANENT_SESSION_LIFETIME'] = 86400 * 7  # 7 days
 
 # Ensure upload folder exists
 app.config['UPLOAD_FOLDER'].mkdir(exist_ok=True)
@@ -98,6 +106,150 @@ def initialize_system():
 initialize_system()
 
 
+# ========== AUTHENTICATION DECORATOR ==========
+def require_login(f):
+    """Decorator to require doctor login for protected routes"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'doctor_id' not in session:
+            return jsonify({'error': 'Non autorizzato. Effettua il login.'}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+# ========== AUTHENTICATION ROUTES ==========
+
+@app.route('/api/auth/register', methods=['POST'])
+def register_doctor():
+    """Register a new doctor."""
+    data = request.json
+    
+    try:
+        # Validate required fields
+        required_fields = ['nome', 'cognome', 'password', 'specializzazione', 'ospedale_affiliato']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'error': f'Campo obbligatorio mancante: {field}'}), 400
+        
+        # Validate password strength (at least 6 characters)
+        if len(data['password']) < 6:
+            return jsonify({'error': 'La password deve contenere almeno 6 caratteri'}), 400
+        
+        # Generate unique doctor ID
+        doctor_id = Doctor.generate_doctor_id(data['nome'], data['cognome'])
+        
+        # Ensure ID is unique
+        if db_connected:
+            while db.doctor_id_exists(doctor_id):
+                doctor_id = Doctor.generate_doctor_id(data['nome'], data['cognome'])
+        
+        # Create doctor object
+        doctor = Doctor(
+            doctor_id=doctor_id,
+            nome=data['nome'].strip().title(),
+            cognome=data['cognome'].strip().title(),
+            specializzazione=data['specializzazione'].strip().title(),
+            ospedale_affiliato=data['ospedale_affiliato'].strip().title(),
+            password_hash=Doctor.hash_password(data['password'])
+        )
+        
+        # Save to database
+        if not db_connected:
+            return jsonify({'error': 'Database non connesso'}), 500
+        
+        if not db.save_doctor(doctor):
+            return jsonify({'error': 'Errore durante la registrazione. ID medico potrebbe esistere già.'}), 400
+        
+        return jsonify({
+            'success': True,
+            'message': 'Registrazione completata con successo',
+            'doctor_id': doctor_id,
+            'doctor_info': {
+                'nome': doctor.nome,
+                'cognome': doctor.cognome,
+                'specializzazione': doctor.specializzazione,
+                'ospedale_affiliato': doctor.ospedale_affiliato
+            }
+        }), 201
+        
+    except Exception as e:
+        print(f"Error in registration: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/auth/login', methods=['POST'])
+def login_doctor():
+    """Authenticate a doctor."""
+    data = request.json
+    
+    try:
+        # Validate required fields
+        if not data.get('doctor_id') or not data.get('password'):
+            return jsonify({'error': 'ID medico e password obbligatori'}), 400
+        
+        doctor_id = data['doctor_id'].strip()
+        password = data['password']
+        
+        if not db_connected:
+            return jsonify({'error': 'Database non connesso'}), 500
+        
+        # Verify credentials
+        if not db.verify_doctor_login(doctor_id, password):
+            return jsonify({'error': 'ID medico o password non validi'}), 401
+        
+        # Get doctor info
+        doctor_data = db.find_doctor_by_id(doctor_id)
+        
+        # Store in session
+        session['doctor_id'] = doctor_id
+        session['doctor_nome'] = doctor_data['nome']
+        session['doctor_cognome'] = doctor_data['cognome']
+        session['doctor_specializzazione'] = doctor_data.get('specializzazione', '')
+        session.permanent = True
+        
+        return jsonify({
+            'success': True,
+            'message': 'Login effettuato con successo',
+            'doctor': {
+                'doctor_id': doctor_id,
+                'nome': doctor_data['nome'],
+                'cognome': doctor_data['cognome'],
+                'specializzazione': doctor_data.get('specializzazione', '')
+            }
+        }), 200
+        
+    except Exception as e:
+        print(f"Error in login: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/auth/logout', methods=['POST'])
+def logout_doctor():
+    """Logout a doctor."""
+    session.clear()
+    return jsonify({'success': True, 'message': 'Logout effettuato'}), 200
+
+
+@app.route('/api/auth/check', methods=['GET'])
+def check_auth():
+    """Check if user is authenticated."""
+    if 'doctor_id' in session:
+        return jsonify({
+            'authenticated': True,
+            'doctor': {
+                'doctor_id': session['doctor_id'],
+                'nome': session.get('doctor_nome', ''),
+                'cognome': session.get('doctor_cognome', ''),
+                'specializzazione': session.get('doctor_specializzazione', '')
+            }
+        }), 200
+    return jsonify({'authenticated': False}), 200
+
+
 @app.route('/')
 def index():
     """Home page."""
@@ -105,6 +257,7 @@ def index():
 
 
 @app.route('/api/patient/search', methods=['POST'])
+@require_login
 def search_patient():
     """Search for a patient by fiscal code."""
     data = request.json
@@ -127,6 +280,7 @@ def search_patient():
 
 
 @app.route('/api/patient/create', methods=['POST'])
+@require_login
 def create_patient():
     """Create a new patient."""
     data = request.json
@@ -205,6 +359,7 @@ def create_patient():
 
 
 @app.route('/api/patient/<fiscal_code>/records', methods=['GET'])
+@require_login
 def get_patient_records(fiscal_code):
     """Get all clinical records for a patient."""
     if not db_connected:
@@ -223,6 +378,7 @@ def get_patient_records(fiscal_code):
 
 
 @app.route('/api/patient/<fiscal_code>/add-record', methods=['POST'])
+@require_login
 def add_clinical_record(fiscal_code):
     """Add a clinical record to a patient."""
     data = request.json
@@ -255,6 +411,7 @@ def add_clinical_record(fiscal_code):
 
 
 @app.route('/api/folder/upload', methods=['POST'])
+@require_login
 def upload_folder():
     """Process uploaded clinical folder."""
     if 'files[]' not in request.files:
@@ -301,6 +458,7 @@ def upload_folder():
 
 
 @app.route('/api/file/upload', methods=['POST'])
+@require_login
 def upload_file():
     """Process single uploaded file."""
     if 'file' not in request.files:
@@ -341,6 +499,7 @@ def upload_file():
 
 
 @app.route('/api/metrics', methods=['GET'])
+@require_login
 def get_metrics():
     """Get system metrics."""
     if metrics_observer:
@@ -350,6 +509,7 @@ def get_metrics():
 
 
 @app.route('/api/export/<fiscal_code>', methods=['GET'])
+@require_login
 def export_patient_data(fiscal_code):
     """Export patient data as JSON."""
     if not db_connected:

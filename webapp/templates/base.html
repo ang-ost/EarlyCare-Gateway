@@ -10,6 +10,9 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+    <!-- Authentication Modal -->
+    {% include 'auth_modal.html' %}
+
     <!-- Header -->
     <header class="header">
         <div class="header-content">
@@ -34,18 +37,18 @@
     <nav class="navbar">
         <div class="nav-content">
             <a href="{{ url_for('index') }}" class="nav-link">
-                <i class="fas fa-home"></i> Home
+                <i class="fas fa-home"></i> Login/Sign-in
             </a>
-            <a href="#" onclick="openPatientSearch()" class="nav-link">
+            <a href="#" onclick="checkAuthAndExecute(openPatientSearch); return false;" class="nav-link">
                 <i class="fas fa-search"></i> Cerca Paziente
             </a>
-            <a href="#" onclick="openPatientForm()" class="nav-link">
+            <a href="#" onclick="checkAuthAndExecute(openPatientForm); return false;" class="nav-link">
                 <i class="fas fa-user-plus"></i> Nuovo Paziente
             </a>
-            <a href="#" onclick="openAddRecordForm()" class="nav-link">
+            <a href="#" onclick="checkAuthAndExecute(openAddRecordForm); return false;" class="nav-link">
                 <i class="fas fa-file-medical"></i> Aggiungi Scheda
             </a>
-            <a href="#" onclick="exportPatientData()" class="nav-link" id="nav-export">
+            <a href="#" onclick="checkAuthAndExecute(exportPatientData); return false;" class="nav-link" id="nav-export">
                 <i class="fas fa-download"></i> Esporta
             </a>
         </div>
@@ -84,6 +87,7 @@
         </div>
     </div>
 
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     {% block extra_js %}{% endblock %}
 </body>

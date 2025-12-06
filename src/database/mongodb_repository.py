@@ -62,6 +62,8 @@ class MongoDBPatientRepository:
             # Collections
             self.patients_collection = self.db['patients']
             self.patient_records_collection = self.db['patient_records']
+            self.doctors_collection = self.db['doctors']  # New: Collection for doctors
+            self.audit_logs_collection = self.db['audit_logs']
             
             # Initialize collections with schemas
             self._initialize_collections()
@@ -971,6 +973,126 @@ class MongoDBPatientRepository:
             logger.error(f"Error retrieving audit logs: {e}")
             return []
     
+    # ========== DOCTOR MANAGEMENT ==========
+    
+    def save_doctor(self, doctor) -> bool:
+        """
+        Save a new doctor to the database.
+        
+        Args:
+            doctor: Doctor object with doctor_id, nome, cognome, etc.
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Check if doctor already exists
+            existing = self.doctors_collection.find_one({'doctor_id': doctor.doctor_id})
+            if existing:
+                logger.warning(f"Doctor with ID {doctor.doctor_id} already exists")
+                return False
+            
+            # Convert to dict and insert
+            doctor_dict = {
+                'doctor_id': doctor.doctor_id,
+                'nome': doctor.nome,
+                'cognome': doctor.cognome,
+                'specializzazione': doctor.specializzazione,
+                'ospedale_affiliato': doctor.ospedale_affiliato,
+                'password_hash': doctor.password_hash,
+                'created_at': doctor.created_at,
+                'last_login': doctor.last_login,
+                'is_active': doctor.is_active
+            }
+            
+            result = self.doctors_collection.insert_one(doctor_dict)
+            logger.info(f"Doctor {doctor.doctor_id} saved successfully")
+            return True
+            
+        except DuplicateKeyError:
+            logger.error(f"Doctor with ID {doctor.doctor_id} already exists")
+            return False
+        except Exception as e:
+            logger.error(f"Error saving doctor: {e}")
+            return False
+    
+    def find_doctor_by_id(self, doctor_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Find a doctor by doctor_id.
+        
+        Args:
+            doctor_id: The doctor's unique ID
+            
+        Returns:
+            Dictionary with doctor data or None if not found
+        """
+        try:
+            doctor = self.doctors_collection.find_one({'doctor_id': doctor_id})
+            if doctor:
+                doctor.pop('_id', None)  # Remove MongoDB's _id field
+            return doctor
+        except Exception as e:
+            logger.error(f"Error finding doctor: {e}")
+            return None
+    
+    def verify_doctor_login(self, doctor_id: str, password: str) -> bool:
+        """
+        Verify doctor login credentials.
+        
+        Args:
+            doctor_id: Doctor's unique ID
+            password: Plain text password to verify
+            
+        Returns:
+            True if credentials are valid, False otherwise
+        """
+        try:
+            doctor_data = self.find_doctor_by_id(doctor_id)
+            
+            if not doctor_data:
+                logger.warning(f"Doctor {doctor_id} not found")
+                return False
+            
+            if not doctor_data.get('is_active', True):
+                logger.warning(f"Doctor {doctor_id} is not active")
+                return False
+            
+            # Verify password
+            from ..models.doctor import Doctor
+            password_valid = Doctor.verify_password(password, doctor_data['password_hash'])
+            
+            if password_valid:
+                # Update last_login timestamp
+                self.doctors_collection.update_one(
+                    {'doctor_id': doctor_id},
+                    {'$set': {'last_login': datetime.now()}}
+                )
+                logger.info(f"Doctor {doctor_id} logged in successfully")
+                return True
+            else:
+                logger.warning(f"Invalid password for doctor {doctor_id}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error verifying doctor login: {e}")
+            return False
+    
+    def doctor_id_exists(self, doctor_id: str) -> bool:
+        """
+        Check if a doctor ID already exists.
+        
+        Args:
+            doctor_id: The doctor ID to check
+            
+        Returns:
+            True if doctor exists, False otherwise
+        """
+        try:
+            return self.doctors_collection.find_one({'doctor_id': doctor_id}) is not None
+        except Exception as e:
+            logger.error(f"Error checking doctor ID: {e}")
+            return False
+
     def close(self):
         """Close MongoDB connection."""
         if self.client:

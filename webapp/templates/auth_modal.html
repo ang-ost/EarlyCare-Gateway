@@ -1,0 +1,196 @@
+<!-- Login/Registration Modal -->
+<div id="auth-modal" class="modal auth-modal" style="display: flex; z-index: 9999;">
+    <div class="modal-content auth-modal-content">
+        <!-- Login Form -->
+        <div id="login-form-container" class="auth-container">
+            <div class="auth-header">
+                <h2><i class="fas fa-sign-in-alt"></i> Accedi a MAV</h2>
+                <p class="auth-subtitle">Sistema di Gestione Cartelle Cliniche</p>
+            </div>
+            <form id="login-form" class="auth-form">
+                <div class="form-group">
+                    <label for="login-doctor-id">ID Medico</label>
+                    <input 
+                        type="text" 
+                        id="login-doctor-id" 
+                        name="doctor_id"
+                        class="form-control auth-input" 
+                        placeholder="Es: M_Rossi_abc123"
+                        required
+                    >
+                    <small class="form-text">Usa l'ID ricevuto durante la registrazione</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="login-password">Password</label>
+                    <div class="password-input-group">
+                        <input 
+                            type="password" 
+                            id="login-password" 
+                            name="password"
+                            class="form-control auth-input" 
+                            placeholder="Inserisci la tua password"
+                            required
+                        >
+                        <button type="button" class="toggle-password" onclick="togglePasswordVisibility('login-password')">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="login-error" class="alert alert-danger" style="display: none;"></div>
+
+                <button type="submit" class="btn btn-primary btn-block auth-btn">
+                    <i class="fas fa-sign-in-alt"></i> Accedi
+                </button>
+            </form>
+
+            <div class="auth-divider">
+                <span>Nuovo medico?</span>
+            </div>
+
+            <button type="button" class="btn btn-secondary btn-block" onclick="switchToRegistration()">
+                <i class="fas fa-user-plus"></i> Registrati qui
+            </button>
+        </div>
+
+        <!-- Registration Form -->
+        <div id="registration-form-container" class="auth-container" style="display: none;">
+            <div class="auth-header">
+                <h2><i class="fas fa-user-plus"></i> Registrazione</h2>
+                <p class="auth-subtitle">Crea un nuovo account</p>
+            </div>
+            <form id="registration-form" class="auth-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="reg-nome">Nome</label>
+                        <input 
+                            type="text" 
+                            id="reg-nome" 
+                            name="nome"
+                            class="form-control auth-input" 
+                            placeholder="Es: Marco"
+                            required
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-cognome">Cognome</label>
+                        <input 
+                            type="text" 
+                            id="reg-cognome" 
+                            name="cognome"
+                            class="form-control auth-input" 
+                            placeholder="Es: Rossi"
+                            required
+                        >
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="reg-specializzazione">Specializzazione</label>
+                        <select id="reg-specializzazione" name="specializzazione" class="form-control auth-input" required>
+                            <option value="">-- Seleziona specializzazione --</option>
+                            <option value="Cardiologia">Cardiologia</option>
+                            <option value="Medicina Generale">Medicina Generale</option>
+                            <option value="Neurologia">Neurologia</option>
+                            <option value="Ortopedia">Ortopedia</option>
+                            <option value="Pediatria">Pediatria</option>
+                            <option value="Radiologia">Radiologia</option>
+                            <option value="Chirurgia">Chirurgia</option>
+                            <option value="Ginecologia">Ginecologia</option>
+                            <option value="Urologia">Urologia</option>
+                            <option value="Psichiatria">Psichiatria</option>
+                            <option value="Anestesia">Anestesia</option>
+                            <option value="Terapia Intensiva">Terapia Intensiva</option>
+                            <option value="Altro">Altro</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-ospedale">Ospedale Affiliato</label>
+                        <input 
+                            type="text" 
+                            id="reg-ospedale" 
+                            name="ospedale_affiliato"
+                            class="form-control auth-input" 
+                            placeholder="Es: Ospedale Centrale"
+                            required
+                        >
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="reg-password">Password</label>
+                    <div class="password-input-group">
+                        <input 
+                            type="password" 
+                            id="reg-password" 
+                            name="password"
+                            class="form-control auth-input" 
+                            placeholder="Almeno 6 caratteri"
+                            required
+                        >
+                        <button type="button" class="toggle-password" onclick="togglePasswordVisibility('reg-password')">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <small class="form-text">La password deve contenere almeno 6 caratteri</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="reg-password-confirm">Conferma Password</label>
+                    <div class="password-input-group">
+                        <input 
+                            type="password" 
+                            id="reg-password-confirm" 
+                            name="password_confirm"
+                            class="form-control auth-input" 
+                            placeholder="Conferma password"
+                            required
+                        >
+                        <button type="button" class="toggle-password" onclick="togglePasswordVisibility('reg-password-confirm')">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="registration-error" class="alert alert-danger" style="display: none;"></div>
+
+                <button type="submit" class="btn btn-primary btn-block auth-btn">
+                    <i class="fas fa-user-plus"></i> Registrati
+                </button>
+            </form>
+
+            <button type="button" class="btn btn-link" onclick="switchToLogin()">
+                ← Torna al Login
+            </button>
+        </div>
+
+        <!-- Success Message -->
+        <div id="registration-success-container" class="auth-container" style="display: none;">
+            <div class="auth-header success-header">
+                <h2><i class="fas fa-check-circle"></i> Registrazione Completata!</h2>
+            </div>
+            <div class="success-content">
+                <p class="success-message">Il tuo account è stato creato con successo.</p>
+                
+                <div class="doctor-id-display">
+                    <p class="doctor-id-label">Il tuo ID Medico:</p>
+                    <div class="doctor-id-box">
+                        <span id="new-doctor-id" class="doctor-id-text"></span>
+                        <button type="button" class="copy-btn" onclick="copyDoctorId()">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                    <small class="form-text">Salva questo ID per il prossimo accesso</small>
+                </div>
+
+                <div class="success-info" id="success-doctor-info"></div>
+
+                <button type="button" class="btn btn-primary btn-block" onclick="switchToLogin()">
+                    <i class="fas fa-sign-in-alt"></i> Accedi ora
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
