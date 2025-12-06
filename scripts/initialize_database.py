@@ -27,8 +27,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def initialize_database(connection_string: str = "mongodb+srv://angelospeed2003:kjhwoP4rXR3UsnaV@mav.0zz64yh.mongodb.net/", 
-                       database_name: str = "earlycare"):
+def initialize_database(connection_string: str = None, 
+                       database_name: str = None,
     """
     Initialize MongoDB database with schemas and indexes.
     
@@ -169,8 +169,8 @@ def main():
     )
     parser.add_argument(
         "--connection",
-        default="mongodb+srv://angelospeed2003:kjhwoP4rXR3UsnaV@mav.0zz64yh.mongodb.net/",
-        help="MongoDB connection string (default: mongodb+srv://angelospeed2003:kjhwoP4rXR3UsnaV@mav.0zz64yh.mongodb.net/)"
+        default=Config.MONGODB_CONNECTION_STRING,
+        help="MongoDB connection string (default: from .env)"
     )
     parser.add_argument(
         "--database",

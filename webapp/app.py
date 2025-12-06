@@ -13,6 +13,7 @@ import sys
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from src.config import Config
 from src.gateway.clinical_gateway import ClinicalGateway
 from src.gateway.folder_processor import ClinicalFolderProcessor
 from src.strategy.strategy_selector import StrategySelector
@@ -28,9 +29,9 @@ except ImportError:
     MongoDBPatientRepository = None
 
 app = Flask(__name__)
-app.secret_key = 'earlycare-secret-key-change-in-production'
+app.secret_key = Config.FLASK_SECRET_KEY
 app.config['UPLOAD_FOLDER'] = Path(__file__).parent / 'uploads'
-app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max file size
+app.config['MAX_CONTENT_LENGTH'] = Config.MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
 # Ensure upload folder exists
 app.config['UPLOAD_FOLDER'].mkdir(exist_ok=True)
@@ -51,30 +52,18 @@ def initialize_system():
         # Initialize MongoDB
         if MONGODB_AVAILABLE:
             try:
-                # Read MongoDB credentials
-                credentials_file = Path(__file__).parent.parent / 'credenziali_db.txt'
-                if credentials_file.exists():
-                    with open(credentials_file, 'r') as f:
-                        lines = f.readlines()
-                        # Parse connection string from credentials file
-                        connection_string = None
-                        for line in lines:
-                            if line.startswith('connection-string:'):
-                                connection_string = line.split(':', 1)[1].strip()
-                                break
-                        
-                        if connection_string:
-                            db = MongoDBPatientRepository(connection_string)
-                            db_connected = True
-                            print("✅ MongoDB connected successfully")
-                        else:
-                            print("MongoDB connection string not found in credentials file")
-                            db_connected = False
-                else:
-                    print("MongoDB credentials file not found")
-                    db_connected = False
+                # Use configuration from .env file
+                db = MongoDBPatientRepository(
+                    connection_string=Config.MONGODB_CONNECTION_STRING,
+                    database_name=Config.MONGODB_DATABASE_NAME,
+                    **Config.get_mongodb_connection_params()
+                )
+                db_connected = True
+                print("✅ MongoDB connected successfully")
+                Config.print_config(hide_secrets=True)
             except Exception as e:
-                print(f"MongoDB not available: {e}")
+                print(f"❌ MongoDB connection failed: {e}")
+                print("⚠️  Check your .env file configuration")
                 db_connected = False
         
         # Initialize gateway components

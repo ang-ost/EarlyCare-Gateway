@@ -13,6 +13,7 @@ import argparse
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from src.config import Config
 from src.database.mongodb_repository import MongoDBPatientRepository
 
 
@@ -238,8 +239,8 @@ Esempi:
     
     parser.add_argument(
         "--connection",
-        default="mongodb+srv://angelospeed2003:kjhwoP4rXR3UsnaV@mav.0zz64yh.mongodb.net/",
-        help="MongoDB connection string"
+        default=Config.MONGODB_CONNECTION_STRING,
+        help="MongoDB connection string (default: from .env)"
     )
     parser.add_argument(
         "--database",

@@ -1,5 +1,11 @@
 credenziali_db.txt
 Settaggio.txt
+
+# Environment variables (IMPORTANT: Never commit credentials!)
+.env
+.env.local
+.env.*.local
+
 # Python
 __pycache__/
 *.py[cod]

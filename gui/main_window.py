@@ -13,6 +13,7 @@ from typing import Optional
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from src.config import Config
 from src.gateway.clinical_gateway import ClinicalGateway
 from src.gateway.folder_processor import ClinicalFolderProcessor
 from src.strategy.strategy_selector import StrategySelector
@@ -414,8 +415,9 @@ class EarlyCareGUI:
             if MONGODB_AVAILABLE:
                 try:
                     self.db = MongoDBPatientRepository(
-                        connection_string="mongodb+srv://angelospeed2003:kjhwoP4rXR3UsnaV@mav.0zz64yh.mongodb.net/",
-                        database_name="earlycare"
+                        connection_string=Config.MONGODB_CONNECTION_STRING,
+                        database_name=Config.MONGODB_DATABASE_NAME,
+                        **Config.get_mongodb_connection_params()
                     )
                     self.db_connected = True
                     self.log("✅ Database MongoDB connesso")
