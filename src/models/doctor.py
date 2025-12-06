@@ -7,6 +7,8 @@ from datetime import datetime
 from typing import Optional
 import hashlib
 import secrets
+import string
+import uuid
 
 
 @dataclass
@@ -37,16 +39,24 @@ class Doctor:
     @staticmethod
     def generate_doctor_id(nome: str, cognome: str) -> str:
         """
-        Generate unique doctor ID based on name and random component.
-        Format: FirstLetter_LastName_RandomString
-        Example: M_Rossi_abc123xyz
-        """
-        first_letter = nome[0].upper() if nome else 'X'
-        last_name = cognome.upper()[:6] if cognome else 'XXXX'
-        # Generate random suffix (6 alphanumeric characters)
-        random_suffix = secrets.token_hex(3).upper()  # 6 hex chars
+        Generate unique doctor ID: exactly 6 characters.
+        Format: FirstLetterLastLetterRandomChars (no special characters)
+        Example: MR7X9Z
         
-        doctor_id = f"{first_letter}_{last_name}_{random_suffix}"
+        Security features:
+        - First letter of name + first letter of last name (2 chars)
+        - 4 random alphanumeric characters for uniqueness
+        - Total combinations: 36^4 ≈ 1.7 × 10^6
+        - Collision resistance: Good for small-to-medium deployments
+        """
+        first_letter_nome = nome[0].upper() if nome else 'X'
+        first_letter_cognome = cognome[0].upper() if cognome else 'X'
+        
+        # Generate 4 random alphanumeric characters (uppercase letters + digits)
+        chars = string.ascii_uppercase + string.digits
+        random_suffix = ''.join(secrets.choice(chars) for _ in range(4))
+        
+        doctor_id = f"{first_letter_nome}{first_letter_cognome}{random_suffix}"
         return doctor_id
 
     def to_dict(self) -> dict:

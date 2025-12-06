@@ -11,6 +11,8 @@
 - [Architecture](#-architecture)
 - [Quick Start](#-quick-start)
 - [Web Application](#-web-application)
+- [Authentication System](#-authentication-system)
+- [Management Scripts](#-management-scripts)
 - [Database Implementation](#-database-implementation)
 - [Project Summary](#-project-summary)
 - [Clinical System Integration](#-clinical-system-integration)
@@ -349,9 +351,71 @@ After starting, open your browser at:
 - **http://localhost:5000**
 - **http://127.0.0.1:5000**
 
+### 🔐 Authentication System
+
+The web application includes a **secure doctor authentication system** with login and registration features:
+
+#### Doctor ID Generation
+
+Each doctor receives a **unique 6-character ID** generated automatically during registration:
+
+**Format**: `MMXXXX` where:
+- **M** = First letter of first name (uppercase)
+- **M** = First letter of last name (uppercase)
+- **XXXX** = 4 random alphanumeric characters (A-Z, 0-9)
+
+**Examples**:
+- Doctor: Mario Rossi → `MR7X9Z`
+- Doctor: Giovanni Bianchi → `GB2A5K`
+- Doctor: Laura Ferrari → `LF1M8P`
+
+**Security Features**:
+- ✅ No special characters (safe for all systems)
+- ✅ 36^4 ≈ 1.7 million possible combinations
+- ✅ Automatic generation (no user input required)
+- ✅ Unique per registration
+- ✅ Human-readable format
+
+#### Login & Registration
+
+**First Access**:
+1. Open http://localhost:5000
+2. See blocking authentication modal
+3. Click "Registrazione" (Registration)
+4. Enter details:
+   - First name (Nome)
+   - Last name (Cognome)
+   - Specialization (Specializzazione) - from dropdown
+   - Hospital/Clinic (Ospedale Affiliato)
+   - Password (minimum requirements)
+5. System auto-generates and displays your Doctor ID
+6. **Copy and save your ID** - needed for future logins
+
+**Subsequent Access**:
+1. Enter your Doctor ID
+2. Enter your password
+3. Click "Login"
+4. Access all app features
+
+#### Protected Features
+
+The following navbar features require authentication:
+- 🔒 Search Patient (Cerca Paziente)
+- 🔒 New Patient (Nuovo Paziente)
+- 🔒 Add Clinical Record (Aggiungi Scheda)
+- 🔒 Export Data (Esporta)
+- ✓ Home (always accessible)
+
+#### Session Management
+
+- **Session Duration**: 7 days (persistent)
+- **Logout**: Clears session and shows login modal
+- **Security**: Passwords hashed with SHA-256
+- **Cookies**: HttpOnly, secure cookies
+
 ### ✨ Web App Features
 
-#### 1. **Patient Management**
+#### 1. **Patient Management** (Authenticated)
 - Search patients by fiscal code or name/surname
 - Add new patients with complete demographics
 - View patient information
@@ -729,6 +793,44 @@ stats = db.get_statistics()
 - ✅ **Flexibility**: Polymorphic schema for clinical_data
 - ✅ **Compliance**: Complete audit logging
 - ✅ **Scalability**: Separation of clinical_data from patient_records
+
+---
+
+## 🔧 Management Scripts
+
+### Delete Doctors Script
+
+Administrative script to manage doctors in the MongoDB database:
+
+```bash
+# Interactive menu (guided mode)
+python scripts/delete_doctors.py
+
+# List all doctors
+python scripts/delete_doctors.py --list
+
+# Delete specific doctor by ID
+python scripts/delete_doctors.py --delete MR7X9Z
+
+# Delete all doctors (requires confirmation)
+python scripts/delete_doctors.py --delete-all
+```
+
+**Features**:
+- ✅ Interactive menu or command-line arguments
+- ✅ View all doctors with details (ID, name, creation date)
+- ✅ Delete individual doctors with confirmation
+- ✅ Bulk delete with double-confirmation for safety
+- ✅ Formatted output with tables
+- ✅ Error handling and validation
+
+**Example Output**:
+```
+Doctor ID            Nome            Cognome         Created
+------------------------------------------------------------------
+MR7X9Z               Mario           Rossi           2025-12-06 12:45:00
+GB2A5K               Giovanni        Bianchi         2025-12-06 14:30:15
+```
 
 ---
 
