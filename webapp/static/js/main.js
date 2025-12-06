@@ -765,17 +765,61 @@ function formatFileSize(bytes) {
 }
 
 function showAlert(message, type = 'info') {
-    const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type}`;
-    alertDiv.textContent = message;
+    // Crea container se non esiste
+    let container = document.querySelector('.toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
     
-    const mainContent = document.querySelector('.main-content');
-    mainContent.insertBefore(alertDiv, mainContent.firstChild);
+    // Icone per tipo di notifica
+    const icons = {
+        success: '<i class="fas fa-check-circle"></i>',
+        danger: '<i class="fas fa-exclamation-circle"></i>',
+        error: '<i class="fas fa-times-circle"></i>',
+        warning: '<i class="fas fa-exclamation-triangle"></i>',
+        info: '<i class="fas fa-info-circle"></i>'
+    };
     
-    // Auto-remove after 5 seconds
+    // Titoli per tipo di notifica
+    const titles = {
+        success: 'Successo',
+        danger: 'Errore',
+        error: 'Errore',
+        warning: 'Attenzione',
+        info: 'Informazione'
+    };
+    
+    // Crea toast
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `
+        <div class="toast-icon">${icons[type] || icons.info}</div>
+        <div class="toast-content">
+            <div class="toast-title">${titles[type] || 'Notifica'}</div>
+            <div class="toast-message">${message}</div>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">
+            <i class="fas fa-times"></i>
+        </button>
+        <div class="toast-progress"></div>
+    `;
+    
+    container.appendChild(toast);
+    
+    // Rimuovi automaticamente dopo 5 secondi
     setTimeout(() => {
-        alertDiv.remove();
+        if (toast.parentElement) {
+            toast.remove();
+        }
     }, 5000);
+    
+    // Limita il numero di toast visibili (max 5)
+    const toasts = container.querySelectorAll('.toast');
+    if (toasts.length > 5) {
+        toasts[0].remove();
+    }
 }
 
 // Close modals when clicking outside

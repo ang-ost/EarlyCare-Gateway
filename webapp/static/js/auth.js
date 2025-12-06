@@ -270,25 +270,87 @@ function togglePasswordVisibility(inputId) {
 // ========== COPY TO CLIPBOARD ==========
 
 function copyDoctorId() {
-    const doctorId = document.getElementById('new-doctor-id').textContent;
+    const doctorIdElement = document.getElementById('new-doctor-id');
+    if (!doctorIdElement) {
+        showAlert('Errore: ID non trovato', 'danger');
+        return;
+    }
     
-    navigator.clipboard.writeText(doctorId).then(() => {
-        const button = event.target.closest('.copy-btn');
-        const originalHTML = button.innerHTML;
+    const doctorId = doctorIdElement.textContent.trim();
+    
+    if (!doctorId) {
+        showAlert('Errore: ID vuoto', 'danger');
+        return;
+    }
+    
+    // Usa l'API moderna clipboard se disponibile
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(doctorId)
+            .then(() => {
+                const button = event.target.closest('.copy-btn');
+                if (button) {
+                    const originalHTML = button.innerHTML;
+                    
+                    button.innerHTML = '<i class="fas fa-check"></i>';
+                    button.style.backgroundColor = 'var(--success)';
+                    
+                    setTimeout(() => {
+                        button.innerHTML = originalHTML;
+                        button.style.backgroundColor = '';
+                    }, 2000);
+                }
+                
+                showAlert('ID medico copiato negli appunti', 'success');
+            })
+            .catch(error => {
+                console.error('Error copying to clipboard:', error);
+                // Fallback se l'API moderna fallisce
+                fallbackCopyToClipboard(doctorId);
+            });
+    } else {
+        // Fallback per browser più vecchi
+        fallbackCopyToClipboard(doctorId);
+    }
+}
+
+// Funzione di fallback per la copia negli appunti
+function fallbackCopyToClipboard(text) {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    textArea.style.top = '-999999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    try {
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
         
-        button.innerHTML = '<i class="fas fa-check"></i>';
-        button.style.backgroundColor = 'var(--success)';
-        
-        setTimeout(() => {
-            button.innerHTML = originalHTML;
-            button.style.backgroundColor = 'var(--secondary)';
-        }, 2000);
-        
-        showAlert('ID medico copiato negli appunti', 'success');
-    }).catch(error => {
-        console.error('Error copying to clipboard:', error);
-        showAlert('Errore nella copia', 'danger');
-    });
+        if (successful) {
+            const button = event.target.closest('.copy-btn');
+            if (button) {
+                const originalHTML = button.innerHTML;
+                
+                button.innerHTML = '<i class="fas fa-check"></i>';
+                button.style.backgroundColor = 'var(--success)';
+                
+                setTimeout(() => {
+                    button.innerHTML = originalHTML;
+                    button.style.backgroundColor = '';
+                }, 2000);
+            }
+            
+            showAlert('ID medico copiato negli appunti', 'success');
+        } else {
+            showAlert('Errore nella copia dell\'ID', 'danger');
+        }
+    } catch (err) {
+        document.body.removeChild(textArea);
+        console.error('Fallback copy failed:', err);
+        showAlert('Impossibile copiare. Copia manualmente l\'ID: ' + text, 'warning');
+    }
 }
 
 // ========== LOGOUT ==========
