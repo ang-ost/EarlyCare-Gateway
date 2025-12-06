@@ -116,8 +116,9 @@ function performSearchByFiscalCode(fiscalCode) {
         }
     })
     .catch(error => {
+        console.error('Errore durante la ricerca:', error);
         hideLoading();
-        showAlert('Errore durante la ricerca: ' + error.message, 'danger');
+        showAlert('Errore durante la ricerca: ' + (error.message || 'Errore sconosciuto'), 'danger');
     });
 }
 
@@ -206,9 +207,11 @@ ${patient.email ? 'Email: ' + patient.email : ''}
     
     document.getElementById('patient-info').innerHTML = `<pre>${patientInfo}</pre>`;
     
-    // Enable action buttons
-    document.getElementById('btn-add-record').disabled = false;
-    document.getElementById('btn-export').disabled = false;
+    // Enable action buttons if they exist
+    const addRecordBtn = document.getElementById('btn-add-record');
+    const exportBtn = document.getElementById('btn-export');
+    if (addRecordBtn) addRecordBtn.disabled = false;
+    if (exportBtn) exportBtn.disabled = false;
     
     // Load clinical records
     loadClinicalRecords(patient.codice_fiscale);
