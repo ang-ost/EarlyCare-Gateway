@@ -20,6 +20,20 @@
                     <div id="patient-info" class="info-box">
                         <p class="text-muted">Nessun paziente selezionato</p>
                     </div>
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                        <button id="btn-add-record" class="btn btn-primary" onclick="openAddRecordForm()" disabled>
+                            <i class="fas fa-plus"></i> Aggiungi Scheda
+                        </button>
+                        <button id="btn-export" class="btn btn-secondary" onclick="exportPatientData()" disabled>
+                            <i class="fas fa-download"></i> Esporta
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Patients List Section (for homonyms) -->
+                <div id="patients-list-section" class="section" style="display: none;">
+                    <h4><i class="fas fa-users"></i> Pazienti Trovati (<span id="patients-count">0</span>)</h4>
+                    <div id="patients-list"></div>
                 </div>
 
                 <!-- File Upload -->
