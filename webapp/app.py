@@ -52,14 +52,14 @@ def initialize_system():
         if MONGODB_AVAILABLE:
             try:
                 # Read MongoDB credentials
-                credentials_file = Path(__file__).parent.parent / 'credenziali_db.txt'
+                credentials_file = Path(__file__).parent.parent / 'credenzialiMongoDB.txt'
                 if credentials_file.exists():
                     with open(credentials_file, 'r') as f:
                         lines = f.readlines()
                         # Parse connection string from credentials file
                         connection_string = None
                         for line in lines:
-                            if line.startswith('connection-string:'):
+                            if line.startswith('connection string:'):
                                 connection_string = line.split(':', 1)[1].strip()
                                 break
                         
