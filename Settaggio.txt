@@ -1,3 +1,16 @@
-- ampliare il form con informazioni riguardanti il triage della data attuale
-- se apro una cartella nella dashboard posso selezionare il file a cui effetuare la diagnosi 
+- convertitore da pdf/docx/txt a json e viceversa.
+    Export json --> pdf
+    Import pdf/docx/txt --> json
+- possibilità di uploadare file di testo (txt, pdf e docx), che poi devono essere convertite in json grazie al convertiore, 
+                                                            e immagini ( png, jpg, jpeg) nel form 'Aggiungi Scheda Clinica'
+- gestisci l'upload dei file funziona come l'uploading nel form
+
+AI:
+- bottone per avviare diagnosi AI nel <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3><i class="fas fa-clipboard-list"></i> Schede Cliniche</h3>
+                    <span id="records-count" class="badge">1</span>
+                </div>
+- devo poter selezionare una scheda clinica presente nella cartella e poterla sottoporre ad analisi AI per ottenere una diagnosi specifica
 - rivedere diagnosi AI perchè stesso risultato, consiglia farmaci ed esami da fare
+
+- icona piccola tonda in basso a destra o in alto a destra che apre una chat con il chatbot GLM, che deve essere rigoroso e sicuro
