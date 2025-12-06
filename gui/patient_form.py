@@ -1,5 +1,5 @@
 """
-Patient Form Dialog - Form for patient data entry
+Patient Form Dialog - Form for patient demographic data entry
 """
 
 import tkinter as tk
@@ -11,7 +11,7 @@ import re
 
 
 class PatientFormDialog:
-    """Dialog for entering patient data manually."""
+    """Dialog for entering patient demographic data only."""
     
     def __init__(self, parent, callback=None):
         """
@@ -27,23 +27,23 @@ class PatientFormDialog:
         
         # Create dialog window
         self.dialog = tk.Toplevel(parent)
-        self.dialog.title("📝 Inserimento Dati Paziente")
-        self.dialog.geometry("700x800")
+        self.dialog.title("👤 Dati Anagrafici Paziente")
+        self.dialog.geometry("700x650")
         self.dialog.transient(parent)
         self.dialog.grab_set()
         
         # Center dialog
         self.dialog.update_idletasks()
         x = (self.dialog.winfo_screenwidth() // 2) - (700 // 2)
-        y = (self.dialog.winfo_screenheight() // 2) - (800 // 2)
+        y = (self.dialog.winfo_screenheight() // 2) - (650 // 2)
         self.dialog.geometry(f"+{x}+{y}")
         
         # Create form
         self.create_form()
     
     def create_form(self):
-        """Create the patient data entry form."""
-        # Main container with scrollbar
+        """Create the patient demographic data entry form."""
+        # Main container
         main_frame = ttk.Frame(self.dialog, padding=20)
         main_frame.pack(fill='both', expand=True)
         
@@ -67,7 +67,7 @@ class PatientFormDialog:
         # Form title
         title_label = ttk.Label(
             scrollable_frame,
-            text="Inserimento Dati Paziente",
+            text="Dati Anagrafici Paziente",
             font=('Segoe UI', 14, 'bold')
         )
         title_label.grid(row=0, column=0, columnspan=2, pady=(0, 20))
@@ -75,53 +75,55 @@ class PatientFormDialog:
         # ==== DATI ANAGRAFICI ====
         row = 1
         
-        # Section header
-        demo_header = ttk.Label(
-            scrollable_frame,
-            text="👤 DATI ANAGRAFICI",
-            font=('Segoe UI', 11, 'bold')
-        )
-        demo_header.grid(row=row, column=0, columnspan=2, sticky='w', pady=(10, 10))
-        row += 1
-        
         # Name
-        ttk.Label(scrollable_frame, text="Nome *:").grid(row=row, column=0, sticky='w', pady=5)
+        ttk.Label(scrollable_frame, text="Nome *:", font=('Segoe UI', 10)).grid(row=row, column=0, sticky='w', pady=8)
         self.name_var = tk.StringVar()
-        ttk.Entry(scrollable_frame, textvariable=self.name_var, width=40).grid(row=row, column=1, sticky='ew', pady=5)
+        name_entry = ttk.Entry(scrollable_frame, textvariable=self.name_var, width=40, font=('Segoe UI', 10))
+        name_entry.grid(row=row, column=1, sticky='ew', pady=8)
         row += 1
         
         # Surname
-        ttk.Label(scrollable_frame, text="Cognome *:").grid(row=row, column=0, sticky='w', pady=5)
+        ttk.Label(scrollable_frame, text="Cognome *:", font=('Segoe UI', 10)).grid(row=row, column=0, sticky='w', pady=8)
         self.surname_var = tk.StringVar()
-        ttk.Entry(scrollable_frame, textvariable=self.surname_var, width=40).grid(row=row, column=1, sticky='ew', pady=5)
+        surname_entry = ttk.Entry(scrollable_frame, textvariable=self.surname_var, width=40, font=('Segoe UI', 10))
+        surname_entry.grid(row=row, column=1, sticky='ew', pady=8)
         row += 1
         
         # Date of Birth
-        ttk.Label(scrollable_frame, text="Data di Nascita (GG/MM/AAAA) *:").grid(row=row, column=0, sticky='w', pady=5)
+        ttk.Label(scrollable_frame, text="Data di Nascita (GG/MM/AAAA) *:", font=('Segoe UI', 10)).grid(row=row, column=0, sticky='w', pady=8)
         self.dob_var = tk.StringVar()
-        ttk.Entry(scrollable_frame, textvariable=self.dob_var, width=40).grid(row=row, column=1, sticky='ew', pady=5)
+        dob_entry = ttk.Entry(scrollable_frame, textvariable=self.dob_var, width=40, font=('Segoe UI', 10))
+        dob_entry.grid(row=row, column=1, sticky='ew', pady=8)
+        row += 1
+        
+        # Date of Death (optional)
+        ttk.Label(scrollable_frame, text="Data del Decesso (GG/MM/AAAA):", font=('Segoe UI', 10)).grid(row=row, column=0, sticky='w', pady=8)
+        self.dod_var = tk.StringVar()
+        dod_entry = ttk.Entry(scrollable_frame, textvariable=self.dod_var, width=40, font=('Segoe UI', 10))
+        dod_entry.grid(row=row, column=1, sticky='ew', pady=8)
         row += 1
         
         # Birth Place
-        ttk.Label(scrollable_frame, text="Comune di Nascita *:").grid(row=row, column=0, sticky='w', pady=5)
+        ttk.Label(scrollable_frame, text="Comune di Nascita *:", font=('Segoe UI', 10)).grid(row=row, column=0, sticky='w', pady=8)
         self.birthplace_var = tk.StringVar()
-        ttk.Entry(scrollable_frame, textvariable=self.birthplace_var, width=40).grid(row=row, column=1, sticky='ew', pady=5)
+        birthplace_entry = ttk.Entry(scrollable_frame, textvariable=self.birthplace_var, width=40, font=('Segoe UI', 10))
+        birthplace_entry.grid(row=row, column=1, sticky='ew', pady=8)
         row += 1
         
         # Gender
-        ttk.Label(scrollable_frame, text="Sesso *:").grid(row=row, column=0, sticky='w', pady=5)
+        ttk.Label(scrollable_frame, text="Sesso:", font=('Segoe UI', 10)).grid(row=row, column=0, sticky='w', pady=8)
         self.gender_var = tk.StringVar(value="M")
         gender_frame = ttk.Frame(scrollable_frame)
-        gender_frame.grid(row=row, column=1, sticky='w', pady=5)
-        ttk.Radiobutton(gender_frame, text="Maschio", variable=self.gender_var, value="M").pack(side='left', padx=5)
-        ttk.Radiobutton(gender_frame, text="Femmina", variable=self.gender_var, value="F").pack(side='left', padx=5)
+        gender_frame.grid(row=row, column=1, sticky='w', pady=8)
+        ttk.Radiobutton(gender_frame, text="Maschio", variable=self.gender_var, value="M").pack(side='left', padx=(0, 15))
+        ttk.Radiobutton(gender_frame, text="Femmina", variable=self.gender_var, value="F").pack(side='left')
         row += 1
         
-        # Calculated Fiscal Code (read-only)
-        ttk.Label(scrollable_frame, text="Codice Fiscale (calcolato):").grid(row=row, column=0, sticky='w', pady=5)
-        self.fiscal_code_var = tk.StringVar(value="Inserire i dati sopra")
-        fiscal_entry = ttk.Entry(scrollable_frame, textvariable=self.fiscal_code_var, width=40, state='readonly')
-        fiscal_entry.grid(row=row, column=1, sticky='ew', pady=5)
+        # Fiscal Code (manual or calculated)
+        ttk.Label(scrollable_frame, text="Codice Fiscale *:", font=('Segoe UI', 10)).grid(row=row, column=0, sticky='w', pady=8)
+        self.fiscal_code_var = tk.StringVar()
+        fiscal_code_entry = ttk.Entry(scrollable_frame, textvariable=self.fiscal_code_var, width=40, font=('Segoe UI', 10))
+        fiscal_code_entry.grid(row=row, column=1, sticky='ew', pady=8)
         row += 1
         
         # Calculate button
@@ -133,52 +135,15 @@ class PatientFormDialog:
         calc_btn.grid(row=row, column=1, sticky='w', pady=5)
         row += 1
         
-        # ==== DATI CLINICI ====
-        
-        # Section header
-        clinical_header = ttk.Label(
-            scrollable_frame,
-            text="🏥 DATI CLINICI",
-            font=('Segoe UI', 11, 'bold')
-        )
-        clinical_header.grid(row=row, column=0, columnspan=2, sticky='w', pady=(20, 10))
+        # Separator
+        ttk.Separator(scrollable_frame, orient='horizontal').grid(row=row, column=0, columnspan=2, sticky='ew', pady=15)
         row += 1
-        
-        # Chief Complaint
-        ttk.Label(scrollable_frame, text="Sintomo/Motivo Principale *:").grid(row=row, column=0, sticky='nw', pady=5)
-        self.chief_complaint_var = tk.StringVar()
-        ttk.Entry(scrollable_frame, textvariable=self.chief_complaint_var, width=40).grid(row=row, column=1, sticky='ew', pady=5)
-        row += 1
-        
-        # Medical History
-        ttk.Label(scrollable_frame, text="Storia Clinica:").grid(row=row, column=0, sticky='nw', pady=5)
-        history_frame = ttk.Frame(scrollable_frame)
-        history_frame.grid(row=row, column=1, sticky='ew', pady=5)
-        self.history_text = tk.Text(history_frame, height=4, width=40, wrap='word')
-        self.history_text.pack(side='left', fill='both', expand=True)
-        history_scroll = ttk.Scrollbar(history_frame, command=self.history_text.yview)
-        history_scroll.pack(side='right', fill='y')
-        self.history_text.config(yscrollcommand=history_scroll.set)
-        ttk.Label(scrollable_frame, text="(Una per riga)", font=('Segoe UI', 8), foreground='gray').grid(row=row+1, column=1, sticky='w')
-        row += 2
-        
-        # Current Medications
-        ttk.Label(scrollable_frame, text="Farmaci Attuali:").grid(row=row, column=0, sticky='nw', pady=5)
-        meds_frame = ttk.Frame(scrollable_frame)
-        meds_frame.grid(row=row, column=1, sticky='ew', pady=5)
-        self.medications_text = tk.Text(meds_frame, height=4, width=40, wrap='word')
-        self.medications_text.pack(side='left', fill='both', expand=True)
-        meds_scroll = ttk.Scrollbar(meds_frame, command=self.medications_text.yview)
-        meds_scroll.pack(side='right', fill='y')
-        self.medications_text.config(yscrollcommand=meds_scroll.set)
-        ttk.Label(scrollable_frame, text="(Una per riga)", font=('Segoe UI', 8), foreground='gray').grid(row=row+1, column=1, sticky='w')
-        row += 2
         
         # Allergies
-        ttk.Label(scrollable_frame, text="Allergie:").grid(row=row, column=0, sticky='nw', pady=5)
+        ttk.Label(scrollable_frame, text="Allergie:", font=('Segoe UI', 10)).grid(row=row, column=0, sticky='nw', pady=8)
         allergies_frame = ttk.Frame(scrollable_frame)
-        allergies_frame.grid(row=row, column=1, sticky='ew', pady=5)
-        self.allergies_text = tk.Text(allergies_frame, height=3, width=40, wrap='word')
+        allergies_frame.grid(row=row, column=1, sticky='ew', pady=8)
+        self.allergies_text = tk.Text(allergies_frame, height=3, width=40, wrap='word', font=('Segoe UI', 10))
         self.allergies_text.pack(side='left', fill='both', expand=True)
         allergies_scroll = ttk.Scrollbar(allergies_frame, command=self.allergies_text.yview)
         allergies_scroll.pack(side='right', fill='y')
@@ -187,57 +152,16 @@ class PatientFormDialog:
         row += 2
         
         # Malattie Permanenti
-        ttk.Label(scrollable_frame, text="Malattie Permanenti:").grid(row=row, column=0, sticky='nw', pady=5)
+        ttk.Label(scrollable_frame, text="Malattie Permanenti:", font=('Segoe UI', 10)).grid(row=row, column=0, sticky='nw', pady=8)
         diseases_frame = ttk.Frame(scrollable_frame)
-        diseases_frame.grid(row=row, column=1, sticky='ew', pady=5)
-        self.diseases_text = tk.Text(diseases_frame, height=3, width=40, wrap='word')
+        diseases_frame.grid(row=row, column=1, sticky='ew', pady=8)
+        self.diseases_text = tk.Text(diseases_frame, height=4, width=40, wrap='word', font=('Segoe UI', 10))
         self.diseases_text.pack(side='left', fill='both', expand=True)
         diseases_scroll = ttk.Scrollbar(diseases_frame, command=self.diseases_text.yview)
         diseases_scroll.pack(side='right', fill='y')
         self.diseases_text.config(yscrollcommand=diseases_scroll.set)
         ttk.Label(scrollable_frame, text="(es: diabete, celiachia, malattie cardiovascolari, neurodegenerative - Una per riga)", font=('Segoe UI', 8), foreground='gray').grid(row=row+1, column=1, sticky='w')
         row += 2
-        
-        # ==== PARAMETRI VITALI ====
-        
-        # Section header
-        vitals_header = ttk.Label(
-            scrollable_frame,
-            text="🩺 PARAMETRI VITALI (Opzionali)",
-            font=('Segoe UI', 11, 'bold')
-        )
-        vitals_header.grid(row=row, column=0, columnspan=2, sticky='w', pady=(20, 10))
-        row += 1
-        
-        # Blood Pressure
-        ttk.Label(scrollable_frame, text="Pressione Arteriosa (es: 120/80):").grid(row=row, column=0, sticky='w', pady=5)
-        self.bp_var = tk.StringVar()
-        ttk.Entry(scrollable_frame, textvariable=self.bp_var, width=40).grid(row=row, column=1, sticky='ew', pady=5)
-        row += 1
-        
-        # Heart Rate
-        ttk.Label(scrollable_frame, text="Frequenza Cardiaca (bpm):").grid(row=row, column=0, sticky='w', pady=5)
-        self.hr_var = tk.StringVar()
-        ttk.Entry(scrollable_frame, textvariable=self.hr_var, width=40).grid(row=row, column=1, sticky='ew', pady=5)
-        row += 1
-        
-        # Temperature
-        ttk.Label(scrollable_frame, text="Temperatura (°C):").grid(row=row, column=0, sticky='w', pady=5)
-        self.temp_var = tk.StringVar()
-        ttk.Entry(scrollable_frame, textvariable=self.temp_var, width=40).grid(row=row, column=1, sticky='ew', pady=5)
-        row += 1
-        
-        # Respiratory Rate
-        ttk.Label(scrollable_frame, text="Frequenza Respiratoria (atti/min):").grid(row=row, column=0, sticky='w', pady=5)
-        self.rr_var = tk.StringVar()
-        ttk.Entry(scrollable_frame, textvariable=self.rr_var, width=40).grid(row=row, column=1, sticky='ew', pady=5)
-        row += 1
-        
-        # SpO2
-        ttk.Label(scrollable_frame, text="Saturazione O2 (%):").grid(row=row, column=0, sticky='w', pady=5)
-        self.spo2_var = tk.StringVar()
-        ttk.Entry(scrollable_frame, textvariable=self.spo2_var, width=40).grid(row=row, column=1, sticky='ew', pady=5)
-        row += 1
         
         # Configure grid column weights
         scrollable_frame.columnconfigure(1, weight=1)
@@ -246,23 +170,14 @@ class PatientFormDialog:
         button_frame = ttk.Frame(self.dialog)
         button_frame.pack(fill='x', padx=20, pady=(10, 20))
         
-        # Save and Export button
-        save_export_btn = ttk.Button(
+        # Required fields note
+        note_label = ttk.Label(
             button_frame,
-            text="💾 Salva ed Esporta JSON",
-            command=self.save_and_export,
-            style='Success.TButton'
+            text="* Campi obbligatori",
+            font=('Segoe UI', 9, 'bold'),
+            foreground='red'
         )
-        save_export_btn.pack(side='left', padx=5)
-        
-        # Save button
-        save_btn = ttk.Button(
-            button_frame,
-            text="✅ Salva e Usa",
-            command=self.save,
-            style='Primary.TButton'
-        )
-        save_btn.pack(side='left', padx=5)
+        note_label.pack(side='left', padx=5)
         
         # Cancel button
         cancel_btn = ttk.Button(
@@ -272,14 +187,13 @@ class PatientFormDialog:
         )
         cancel_btn.pack(side='right', padx=5)
         
-        # Required fields note
-        note_label = ttk.Label(
+        # Save button
+        save_btn = ttk.Button(
             button_frame,
-            text="* Campi obbligatori",
-            font=('Segoe UI', 8),
-            foreground='red'
+            text="✅ Salva Paziente",
+            command=self.save
         )
-        note_label.pack(side='right', padx=20)
+        save_btn.pack(side='right', padx=5)
     
     def calculate_fiscal_code(self):
         """Calculate Italian fiscal code following official rules."""
@@ -287,16 +201,18 @@ class PatientFormDialog:
         surname = self.surname_var.get().strip().upper()
         dob = self.dob_var.get().strip()
         birthplace = self.birthplace_var.get().strip().upper()
-        gender = self.gender_var.get()
         
         # Validate inputs
         if not name or not surname or not dob or not birthplace:
-            messagebox.showwarning("Attenzione", "Compilare tutti i campi anagrafici prima di calcolare il codice fiscale")
+            messagebox.showwarning("Attenzione", "Compilare Nome, Cognome, Data di Nascita e Comune di Nascita prima di calcolare il codice fiscale")
             return
+        
+        # Get gender from radio button
+        gender = self.gender_var.get()
         
         # Parse date (GG/MM/AAAA)
         try:
-            day, month, year = dob.split('/')
+            day, month, year = [x.strip() for x in dob.split('/')]
             day = int(day)
             month = int(month)
             year = int(year)
@@ -535,40 +451,52 @@ class PatientFormDialog:
             messagebox.showerror("Errore", "Comune di Nascita è obbligatorio")
             return False
         
-        # Validate date format (GG/MM/AAAA)
+        if not self.fiscal_code_var.get().strip():
+            messagebox.showerror("Errore", "Codice Fiscale è obbligatorio")
+            return False
+        
+        # Validate date format (GG/MM/AAAA) for birth date
         try:
-            day, month, year = self.dob_var.get().strip().split('/')
+            day, month, year = [x.strip() for x in self.dob_var.get().strip().split('/')]
             datetime(int(year), int(month), int(day))
         except:
             messagebox.showerror("Errore", "Formato Data di Nascita non valido (usa GG/MM/AAAA, es: 15/06/1975)")
             return False
         
-        if not self.chief_complaint_var.get().strip():
-            messagebox.showerror("Errore", "Sintomo/Motivo Principale è obbligatorio")
-            return False
-        
-        # Check if fiscal code is calculated
-        if self.fiscal_code_var.get() == "Inserire i dati sopra" or not self.fiscal_code_var.get().strip():
-            messagebox.showerror("Errore", "Calcolare il Codice Fiscale prima di salvare")
-            return False
+        # Validate date of death if provided
+        if self.dod_var.get().strip():
+            try:
+                day, month, year = [x.strip() for x in self.dod_var.get().strip().split('/')]
+                datetime(int(year), int(month), int(day))
+            except:
+                messagebox.showerror("Errore", "Formato Data del Decesso non valido (usa GG/MM/AAAA)")
+                return False
         
         return True
     
     def get_patient_data(self):
-        """Get patient data from form."""
+        """Get patient demographic data from form."""
         # Parse text fields
-        history = [line.strip() for line in self.history_text.get(1.0, tk.END).split('\n') if line.strip()]
-        medications = [line.strip() for line in self.medications_text.get(1.0, tk.END).split('\n') if line.strip()]
         allergies = [line.strip() for line in self.allergies_text.get(1.0, tk.END).split('\n') if line.strip()]
         diseases = [line.strip() for line in self.diseases_text.get(1.0, tk.END).split('\n') if line.strip()]
         
         # Convert date format from GG/MM/AAAA to AAAA-MM-GG for internal use
         dob_input = self.dob_var.get().strip()
         try:
-            day, month, year = dob_input.split('/')
+            day, month, year = [x.strip() for x in dob_input.split('/')]
             dob_formatted = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
         except:
             dob_formatted = dob_input
+        
+        # Convert date of death if provided
+        dod_formatted = None
+        dod_input = self.dod_var.get().strip()
+        if dod_input:
+            try:
+                day, month, year = [x.strip() for x in dod_input.split('/')]
+                dod_formatted = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+            except:
+                dod_formatted = dod_input
         
         fiscal_code = self.fiscal_code_var.get().strip()
         
@@ -577,55 +505,15 @@ class PatientFormDialog:
             "nome": self.name_var.get().strip(),
             "cognome": self.surname_var.get().strip(),
             "data_nascita": dob_formatted,
+            "data_decesso": dod_formatted,
             "comune_nascita": self.birthplace_var.get().strip(),
             "codice_fiscale": fiscal_code,
-            "allergie": allergies,
-            "malattie_permanenti": diseases,
-            "gender": self.gender_var.get(),
-            "medical_record_number": fiscal_code,  # Use fiscal code as MRN
-            "chief_complaint": self.chief_complaint_var.get().strip(),
-            "medical_history": history,
-            "medications": medications,
-            "vital_signs": {
-                "blood_pressure": self.bp_var.get().strip() or None,
-                "heart_rate": self.hr_var.get().strip() or None,
-                "temperature": self.temp_var.get().strip() or None,
-                "respiratory_rate": self.rr_var.get().strip() or None,
-                "spo2": self.spo2_var.get().strip() or None
-            }
+            "gender": self.gender_var.get(),  # M or F
+            "allergie": allergies if allergies else [],
+            "malattie_permanenti": diseases if diseases else []
         }
         
         return data
-    
-    def save_and_export(self):
-        """Save and export patient data to JSON file."""
-        if not self.validate_required_fields():
-            return
-        
-        data = self.get_patient_data()
-        
-        # Ask where to save
-        from tkinter import filedialog
-        file_path = filedialog.asksaveasfilename(
-            defaultextension=".json",
-            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
-            initialfile=f"patient_{data['patient_id']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        )
-        
-        if file_path:
-            try:
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
-                
-                self.result = data
-                
-                # Call callback if provided
-                if self.callback:
-                    self.callback(data, file_path)
-                
-                self.dialog.destroy()
-            except Exception as e:
-                messagebox.showerror("Errore", f"Impossibile salvare il file:\n{e}")
     
     def save(self):
         """Save patient data without exporting."""

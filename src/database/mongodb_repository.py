@@ -145,22 +145,35 @@ class MongoDBPatientRepository:
     
     def _dict_to_patient(self, data: Dict[str, Any]) -> Patient:
         """Convert MongoDB dictionary to Patient object."""
-        return Patient(
-            patient_id=data["patient_id"],
-            nome=data["nome"],
-            cognome=data["cognome"],
-            data_nascita=data["data_nascita"],
-            comune_nascita=data["comune_nascita"],
-            codice_fiscale=data["codice_fiscale"],
-            data_decesso=data.get("data_decesso"),
-            allergie=data.get("allergie", []),
-            malattie_permanenti=data.get("malattie_permanenti", []),
-            gender=Gender(data["gender"]) if "gender" in data else None,
-            medical_record_number=data.get("medical_record_number"),
-            age=data.get("age"),
-            ethnicity=data.get("ethnicity"),
-            primary_language=data.get("primary_language", "it")
-        )
+        try:
+            # Handle both old and new schema
+            # Old schema used: date_of_birth, allergies, medical_history
+            # New schema uses: data_nascita, allergie, malattie_permanenti, nome, cognome, comune_nascita
+            
+            data_nascita = data.get("data_nascita") or data.get("date_of_birth") or datetime.now()
+            allergie = data.get("allergie") or data.get("allergies") or []
+            malattie = data.get("malattie_permanenti") or data.get("medical_history") or []
+            
+            return Patient(
+                patient_id=data.get("patient_id", data.get("codice_fiscale", "")),
+                nome=data.get("nome", ""),
+                cognome=data.get("cognome", ""),
+                data_nascita=data_nascita,
+                comune_nascita=data.get("comune_nascita", ""),
+                codice_fiscale=data.get("codice_fiscale", ""),
+                data_decesso=data.get("data_decesso"),
+                allergie=allergie,
+                malattie_permanenti=malattie,
+                gender=Gender(data["gender"]) if "gender" in data else None,
+                medical_record_number=data.get("medical_record_number", ""),
+                age=data.get("age"),
+                ethnicity=data.get("ethnicity"),
+                primary_language=data.get("primary_language", "it")
+            )
+        except Exception as e:
+            logger.error(f"Error converting dict to patient: {e}")
+            logger.error(f"Data: {data}")
+            raise
     
     def _patient_record_to_dict(self, record: PatientRecord) -> Dict[str, Any]:
         """Convert PatientRecord object to dictionary for MongoDB."""
@@ -260,6 +273,13 @@ class MongoDBPatientRepository:
         """
         try:
             patient_dict = self._patient_to_dict(patient)
+            print(f"\n=== DEBUG SAVE PATIENT ===")
+            print(f"Nome: {patient_dict.get('nome')}")
+            print(f"Cognome: {patient_dict.get('cognome')}")
+            print(f"Codice Fiscale: {patient_dict.get('codice_fiscale')}")
+            print(f"Comune Nascita: {patient_dict.get('comune_nascita')}")
+            print(f"Data Nascita: {patient_dict.get('data_nascita')}")
+            print(f"Full dict keys: {patient_dict.keys()}")
             self.patients_collection.insert_one(patient_dict)
             logger.info(f"Saved patient: {patient.patient_id}")
             return True
@@ -272,18 +292,32 @@ class MongoDBPatientRepository:
     
     def get_patient(self, patient_id: str) -> Optional[Patient]:
         """
-        Retrieve a patient by ID.
+        Retrieve a patient by ID or codice_fiscale.
         
         Args:
-            patient_id: Patient identifier
+            patient_id: Patient identifier or codice fiscale
             
         Returns:
             Patient object or None if not found
         """
         try:
+            # Try searching by codice_fiscale first (most common)
+            data = self.patients_collection.find_one({"codice_fiscale": patient_id})
+            if data:
+                print(f"\n=== DEBUG GET PATIENT ===")
+                print(f"Found by codice_fiscale: {patient_id}")
+                print(f"Nome from DB: {data.get('nome')}")
+                print(f"Cognome from DB: {data.get('cognome')}")
+                print(f"Comune Nascita from DB: {data.get('comune_nascita')}")
+                print(f"Data Nascita from DB: {data.get('data_nascita')}")
+                print(f"DB keys: {data.keys()}")
+                return self._dict_to_patient(data)
+            
+            # If not found, try by patient_id
             data = self.patients_collection.find_one({"patient_id": patient_id})
             if data:
                 return self._dict_to_patient(data)
+            
             return None
         except Exception as e:
             logger.error(f"Error retrieving patient: {e}")
@@ -335,6 +369,29 @@ class MongoDBPatientRepository:
         except Exception as e:
             logger.error(f"Error deleting patient: {e}")
             return False
+    
+    def find_patients_by_name(self, nome: str, cognome: str) -> List[Patient]:
+        """
+        Find patients by nome and cognome.
+        
+        Args:
+            nome: Patient first name
+            cognome: Patient last name
+            
+        Returns:
+            List of matching Patient objects
+        """
+        try:
+            query = {
+                "nome": {"$regex": f"^{nome}$", "$options": "i"},
+                "cognome": {"$regex": f"^{cognome}$", "$options": "i"}
+            }
+            cursor = self.patients_collection.find(query)
+            patients = [self._dict_to_patient(data) for data in cursor]
+            return patients
+        except Exception as e:
+            logger.error(f"Error finding patients by name: {e}")
+            return []
     
     def find_patients(self, query: Dict[str, Any]) -> List[Patient]:
         """

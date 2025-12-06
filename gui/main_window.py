@@ -3,7 +3,7 @@ EarlyCare Gateway - Main GUI Window
 """
 
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox, scrolledtext
+from tkinter import ttk, filedialog, messagebox, scrolledtext, simpledialog
 from pathlib import Path
 import threading
 import json
@@ -19,6 +19,9 @@ from src.strategy.strategy_selector import StrategySelector
 from src.observer.metrics_observer import MetricsObserver, AuditObserver
 from src.models.patient import Patient, Gender
 from gui.patient_form import PatientFormDialog
+from gui.patient_search_form import PatientSearchDialog
+from gui.clinical_record_form import ClinicalRecordDialog
+from gui.add_record_form import AddRecordDialog
 
 # MongoDB integration
 try:
@@ -60,6 +63,9 @@ class EarlyCareGUI:
         
         # Initialize system
         self.initialize_system()
+        
+        # Open patient form on startup
+        self.root.after(100, self.open_patient_form)
     
     def setup_style(self):
         """Setup modern UI style."""
@@ -114,7 +120,10 @@ class EarlyCareGUI:
         # File menu
         file_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="File", menu=file_menu)
-        file_menu.add_command(label="📝 Inserisci Dati Paziente...", command=self.open_patient_form)
+        file_menu.add_command(label="🔍 Cerca Paziente...", command=self.open_patient_search)
+        file_menu.add_command(label="📋 Nuova Scheda Clinica...", command=self.open_clinical_record_form)
+        file_menu.add_separator()
+        file_menu.add_command(label="📝 Inserisci Nuovo Paziente...", command=self.open_patient_form)
         file_menu.add_separator()
         file_menu.add_command(label="Apri Cartella Clinica...", command=self.select_folder)
         file_menu.add_command(label="Apri File Singolo...", command=self.select_file)
@@ -222,14 +231,14 @@ class EarlyCareGUI:
         upload_menu.add_command(label="📄 File Singolo", command=self.select_file)
         upload_btn['menu'] = upload_menu
         
-        # New Patient button
-        new_patient_btn = ttk.Button(
+        # Add Record button
+        add_record_btn = ttk.Button(
             folder_frame,
             text="📝 Aggiungi Scheda",
-            command=self.open_patient_form,
+            command=self.open_add_record_form,
             style='Primary.TButton'
         )
-        new_patient_btn.pack(side='right', padx=(5, 0))
+        add_record_btn.pack(side='right', padx=(5, 0))
         
         # Search frame
         search_frame = ttk.Frame(panel)
@@ -256,11 +265,11 @@ class EarlyCareGUI:
         search_entry.bind('<Return>', lambda e: self.search_patient())
         
         # Patient info display
-        info_frame = ttk.LabelFrame(panel, text="👤 Informazioni Paziente", padding=10)
-        info_frame.pack(fill='both', expand=True, pady=(0, 15))
+        self.patient_info_frame = ttk.LabelFrame(panel, text="👤 Informazioni Paziente", padding=10)
+        self.patient_info_frame.pack(fill='both', expand=True, pady=(0, 15))
         
         self.patient_info_text = scrolledtext.ScrolledText(
-            info_frame,
+            self.patient_info_frame,
             height=8,
             font=('Consolas', 9),
             wrap='word',
@@ -904,8 +913,17 @@ nella directory del progetto.
         """Open patient data entry form."""
         def on_patient_saved(patient_data, file_path=None):
             """Callback when patient data is saved."""
-            fiscal_code = patient_data.get('fiscal_code', patient_data.get('patient_id', ''))
-            self.log(f"📝 Dati paziente inseriti: {fiscal_code}")
+            # DEBUG: Print all received data
+            self.log(f"=== DEBUG CALLBACK ===")
+            self.log(f"Received patient_data keys: {patient_data.keys()}")
+            self.log(f"Nome: '{patient_data.get('nome', 'MISSING')}'")
+            self.log(f"Cognome: '{patient_data.get('cognome', 'MISSING')}'")
+            self.log(f"Codice Fiscale: '{patient_data.get('codice_fiscale', 'MISSING')}'")
+            self.log(f"Comune Nascita: '{patient_data.get('comune_nascita', 'MISSING')}'")
+            self.log(f"Data Nascita: '{patient_data.get('data_nascita', 'MISSING')}'")
+            
+            fiscal_code = patient_data.get('codice_fiscale', patient_data.get('patient_id', ''))
+            self.log(f"📝 Dati paziente inseriti: {patient_data.get('nome', '')} {patient_data.get('cognome', '')}")
             
             # Save to MongoDB if available
             if self.db_connected and self.db:
@@ -914,79 +932,31 @@ nella directory del progetto.
                     existing_patient = self.db.get_patient(fiscal_code)
                     
                     if existing_patient:
-                        # Patient exists - add new record to their clinical folder
-                        self.log(f"ℹ Paziente già presente nel database: {fiscal_code}")
-                        self.log(f"📁 Aggiungo nuova scheda alla cartella clinica esistente...")
+                        # Patient already exists - display their data in main panels
+                        self.log(f"ℹ️ Paziente già presente nel database: {fiscal_code}")
+                        self.log(f"📊 Caricamento dati paziente esistente nella schermata principale...")
                         
-                        # Create PatientRecord with new clinical data
-                        from src.models.patient import PatientRecord
-                        from src.models.clinical_data import TextData, DataType, DataSource
-                        import uuid
+                        # DEBUG: Check existing patient object
+                        self.log(f"=== DEBUG EXISTING PATIENT ===")
+                        self.log(f"Existing.nome: '{existing_patient.nome}'")
+                        self.log(f"Existing.cognome: '{existing_patient.cognome}'")
+                        self.log(f"Existing.codice_fiscale: '{existing_patient.codice_fiscale}'")
+                        self.log(f"Existing.comune_nascita: '{existing_patient.comune_nascita}'")
+                        self.log(f"Existing.data_nascita: {existing_patient.data_nascita}")
                         
-                        # Create clinical data from form
-                        clinical_data = []
+                        # If existing patient has empty fields, use form data to create a complete patient object
+                        if not existing_patient.nome or not existing_patient.cognome:
+                            self.log(f"⚠️ Existing patient has empty fields, recreating from form data...")
+                            existing_patient = self.convert_form_data_to_patient(patient_data)
                         
-                        # Add chief complaint as clinical data
-                        chief_complaint = patient_data.get('chief_complaint', '')
-                        if chief_complaint:
-                            chief_complaint_data = TextData(
-                                data_id=str(uuid.uuid4()),
-                                patient_id=fiscal_code,
-                                timestamp=datetime.now(),
-                                source=DataSource.MANUAL,
-                                text_content=chief_complaint,
-                                language='it',
-                                document_type='chief_complaint'
-                            )
-                            clinical_data.append(chief_complaint_data)
+                        # Fetch patient records from database
+                        records = self.db.get_patient_records(fiscal_code)
                         
-                        # Add vital signs if present
-                        vital_signs = patient_data.get('vital_signs', {})
-                        if any(vital_signs.values()):
-                            vital_text = "Parametri Vitali:\n"
-                            if vital_signs.get('blood_pressure'):
-                                vital_text += f"- Pressione: {vital_signs['blood_pressure']}\n"
-                            if vital_signs.get('heart_rate'):
-                                vital_text += f"- Freq. Cardiaca: {vital_signs['heart_rate']} bpm\n"
-                            if vital_signs.get('temperature'):
-                                vital_text += f"- Temperatura: {vital_signs['temperature']} °C\n"
-                            if vital_signs.get('respiratory_rate'):
-                                vital_text += f"- Freq. Respiratoria: {vital_signs['respiratory_rate']} atti/min\n"
-                            if vital_signs.get('spo2'):
-                                vital_text += f"- SpO2: {vital_signs['spo2']}%\n"
-                            
-                            vital_data = TextData(
-                                data_id=str(uuid.uuid4()),
-                                patient_id=fiscal_code,
-                                timestamp=datetime.now(),
-                                source=DataSource.MANUAL,
-                                text_content=vital_text,
-                                language='it',
-                                document_type='vital_signs'
-                            )
-                            clinical_data.append(vital_data)
+                        # Display in main GUI panels
+                        self._display_patient_in_panels(existing_patient, records)
+                        self.log(f"✓ Dati paziente visualizzati nella schermata principale")
                         
-                        # Create new patient record
-                        new_record = PatientRecord(
-                            patient=existing_patient,
-                            clinical_data=clinical_data,
-                            encounter_id=str(uuid.uuid4()),
-                            encounter_timestamp=datetime.now(),
-                            priority='routine',
-                            chief_complaint=patient_data.get('chief_complaint', ''),
-                            current_medications=patient_data.get('medications', []),
-                            metadata={
-                                'source': 'GUI Manual Entry',
-                                'entry_date': datetime.now().isoformat(),
-                                'vital_signs': vital_signs
-                            }
-                        )
-                        
-                        # Save patient record
-                        if self.db.save_patient_record(new_record):
-                            self.log(f"✓ Nuova scheda aggiunta alla cartella clinica del paziente")
-                        else:
-                            self.log(f"⚠ Errore nel salvare la nuova scheda clinica")
+                        return
                     
                     else:
                         # Patient doesn't exist - create new patient
@@ -995,114 +965,444 @@ nella directory del progetto.
                         # Convert patient_data to Patient object
                         patient = self.convert_form_data_to_patient(patient_data)
                         
+                        # DEBUG: Verify patient object after creation
+                        self.log(f"=== DEBUG PATIENT OBJECT ===")
+                        self.log(f"Patient.nome: '{patient.nome}'")
+                        self.log(f"Patient.cognome: '{patient.cognome}'")
+                        self.log(f"Patient.codice_fiscale: '{patient.codice_fiscale}'")
+                        self.log(f"Patient.comune_nascita: '{patient.comune_nascita}'")
+                        self.log(f"Patient.data_nascita: {patient.data_nascita}")
+                        self.log(f"Patient.age: {patient.age}")
+                        
                         # Save to database
                         if self.db.save_patient(patient):
                             self.log(f"✓ Nuovo paziente salvato nel database MongoDB")
                             
-                            # Also create first patient record
-                            from src.models.patient import PatientRecord
-                            from src.models.clinical_data import TextData, DataType, DataSource
-                            import uuid
+                            # Automatically display the newly created patient in the main panels
+                            self.log(f"📊 Caricamento dati paziente nella schermata principale...")
                             
-                            # Create clinical data from form
-                            clinical_data = []
+                            # Use the patient object we just created (has all the form data)
+                            # instead of fetching from database which might have issues
+                            records = self.db.get_patient_records(fiscal_code)
                             
-                            # Add chief complaint
-                            chief_complaint = patient_data.get('chief_complaint', '')
-                            if chief_complaint:
-                                chief_complaint_data = TextData(
-                                    data_id=str(uuid.uuid4()),
-                                    patient_id=fiscal_code,
-                                    timestamp=datetime.now(),
-                                    source=DataSource.MANUAL,
-                                    text_content=chief_complaint,
-                                    language='it',
-                                    document_type='chief_complaint'
-                                )
-                                clinical_data.append(chief_complaint_data)
+                            # Display in main GUI panels using the patient object we created
+                            self._display_patient_in_panels(patient, records)
+                            self.log(f"✓ Dati paziente visualizzati nella schermata principale")
                             
-                            # Add vital signs if present
-                            vital_signs = patient_data.get('vital_signs', {})
-                            if any(vital_signs.values()):
-                                vital_text = "Parametri Vitali:\n"
-                                if vital_signs.get('blood_pressure'):
-                                    vital_text += f"- Pressione: {vital_signs['blood_pressure']}\n"
-                                if vital_signs.get('heart_rate'):
-                                    vital_text += f"- Freq. Cardiaca: {vital_signs['heart_rate']} bpm\n"
-                                if vital_signs.get('temperature'):
-                                    vital_text += f"- Temperatura: {vital_signs['temperature']} °C\n"
-                                if vital_signs.get('respiratory_rate'):
-                                    vital_text += f"- Freq. Respiratoria: {vital_signs['respiratory_rate']} atti/min\n"
-                                if vital_signs.get('spo2'):
-                                    vital_text += f"- SpO2: {vital_signs['spo2']}%\n"
-                                
-                                vital_data = TextData(
-                                    data_id=str(uuid.uuid4()),
-                                    patient_id=fiscal_code,
-                                    timestamp=datetime.now(),
-                                    source=DataSource.MANUAL,
-                                    text_content=vital_text,
-                                    language='it',
-                                    document_type='vital_signs'
-                                )
-                                clinical_data.append(vital_data)
-                            
-                            # Create initial patient record
-                            initial_record = PatientRecord(
-                                patient=patient,
-                                clinical_data=clinical_data,
-                                encounter_id=str(uuid.uuid4()),
-                                encounter_timestamp=datetime.now(),
-                                priority='routine',
-                                chief_complaint=patient_data.get('chief_complaint', ''),
-                                current_medications=patient_data.get('medications', []),
-                                metadata={
-                                    'source': 'GUI Manual Entry',
-                                    'entry_date': datetime.now().isoformat(),
-                                    'vital_signs': vital_signs,
-                                    'initial_record': True
-                                }
+                            messagebox.showinfo(
+                                "✓ Nuova Area Riservata Creata",
+                                f"Paziente {patient.nome} {patient.cognome} salvato con successo!\n\n"
+                                f"È stata creata una nuova area riservata per:\n\n"
+                                f"  • Nome e Cognome: {patient.nome} {patient.cognome}\n"
+                                f"  • Codice Fiscale: {patient.codice_fiscale}\n\n"
+                                "Ora ti trovi nell'area riservata del paziente.\n"
+                                "Puoi aggiungere schede cliniche usando il pulsante 'Aggiungi Scheda'."
                             )
-                            
-                            # Save initial patient record
-                            if self.db.save_patient_record(initial_record):
-                                self.log(f"✓ Cartella clinica iniziale creata")
                         else:
                             self.log(f"⚠ Errore nel salvataggio del nuovo paziente")
+                            messagebox.showerror("Errore", "Errore nel salvataggio del paziente nel database")
                             
                 except Exception as e:
                     self.log(f"❌ Errore salvando paziente nel database: {e}")
                     import traceback
                     traceback.print_exc()
-                    messagebox.showwarning(
-                        "Avviso Database",
-                        f"Impossibile salvare nel database MongoDB:\n{e}\n\nI dati sono comunque disponibili per l'elaborazione."
+                    messagebox.showerror(
+                        "Errore Database",
+                        f"Impossibile salvare nel database MongoDB:\n{e}"
                     )
-            
-            if file_path:
-                # If exported to file, load that folder
-                folder_path = Path(file_path).parent
-                self.current_folder = str(folder_path)
-                self.current_file = None
-                self.is_single_file = False
-                self.folder_var.set(str(folder_path))
-                
-                # Display patient info
-                self.display_manual_patient_info(patient_data)
-                
-                # Check for other files in the folder
-                self.scan_folder_files(str(folder_path))
-                
-                self.process_btn_text.set("🚀 Elabora Cartella Clinica")
-                self.process_btn['state'] = 'normal'
-                self.status_var.set(f"Paziente caricato: {patient_data['patient_id']}")
             else:
-                # If not exported, just display the info
-                self.display_manual_patient_info(patient_data)
-                self.status_var.set(f"Dati paziente inseriti: {patient_data['patient_id']}")
+                messagebox.showwarning(
+                    "Database Non Connesso",
+                    "Database non connesso. Il paziente non è stato salvato.\n\n"
+                    "Verifica la connessione al database MongoDB."
+                )
         
         # Open form dialog
         form = PatientFormDialog(self.root, callback=on_patient_saved)
+    
+    def open_patient_search(self):
+        """Open patient search form."""
+        if not self.db_connected or not self.db:
+            messagebox.showwarning(
+                "Database Non Connesso",
+                "Connetti al database MongoDB prima di cercare un paziente."
+            )
+            return
+        
+        def on_patient_found(search_criteria):
+            """Callback when patient search is submitted."""
+            self.log(f"🔍 Ricerca paziente: {search_criteria}")
+            
+            try:
+                # Search by codice fiscale first
+                patient = None
+                if 'codice_fiscale' in search_criteria:
+                    patient = self.db.get_patient(search_criteria['codice_fiscale'])
+                
+                # If not found and nome/cognome provided, search by name
+                if not patient and 'nome' in search_criteria and 'cognome' in search_criteria:
+                    # Search by nome and cognome
+                    patients = self.db.find_patients_by_name(
+                        search_criteria['nome'],
+                        search_criteria['cognome']
+                    )
+                    if patients and len(patients) > 0:
+                        patient = patients[0]  # Take first match
+                
+                if patient:
+                    self.log(f"✓ Paziente trovato: {patient.nome} {patient.cognome}")
+                    self.display_patient_records(patient)
+                else:
+                    self.log(f"⚠ Nessun paziente trovato con i criteri specificati")
+                    messagebox.showinfo(
+                        "Paziente Non Trovato",
+                        "Nessun paziente trovato con i criteri di ricerca specificati."
+                    )
+            
+            except Exception as e:
+                self.log(f"❌ Errore nella ricerca: {e}")
+                messagebox.showerror("Errore", f"Errore nella ricerca del paziente:\n{e}")
+        
+        # Open search dialog
+        search_form = PatientSearchDialog(self.root, callback=on_patient_found)
+    
+    def open_clinical_record_form(self, patient_info=None):
+        """Open clinical record form."""
+        if not self.db_connected or not self.db:
+            messagebox.showwarning(
+                "Database Non Connesso",
+                "Connetti al database MongoDB prima di creare una scheda clinica."
+            )
+            return
+        
+        # If no patient info provided, ask user to search for patient first
+        if not patient_info:
+            messagebox.showinfo(
+                "Seleziona Paziente",
+                "Prima di creare una scheda clinica, cerca il paziente usando 'Cerca Paziente' nel menu File."
+            )
+            return
+        
+        def on_record_saved(record_data):
+            """Callback when clinical record is saved."""
+            self.log(f"📋 Nuova scheda clinica creata per paziente: {record_data.get('patient_id', '')}")
+            
+            try:
+                # Save to database
+                from src.models.patient import PatientRecord
+                from src.models.clinical_data import TextData, DataSource
+                import uuid
+                
+                # Get patient from database
+                patient = self.db.get_patient(record_data['patient_id'])
+                if not patient:
+                    raise ValueError("Paziente non trovato nel database")
+                
+                # Create clinical data
+                clinical_data = []
+                
+                # Add chief complaint
+                if record_data.get('chief_complaint'):
+                    clinical_data.append(TextData(
+                        data_id=str(uuid.uuid4()),
+                        patient_id=record_data['patient_id'],
+                        timestamp=datetime.now(),
+                        source=DataSource.MANUAL,
+                        text_content=record_data['chief_complaint'],
+                        language='it',
+                        document_type='chief_complaint'
+                    ))
+                
+                # Add symptoms
+                if record_data.get('sintomi'):
+                    clinical_data.append(TextData(
+                        data_id=str(uuid.uuid4()),
+                        patient_id=record_data['patient_id'],
+                        timestamp=datetime.now(),
+                        source=DataSource.MANUAL,
+                        text_content=record_data['sintomi'],
+                        language='it',
+                        document_type='symptoms'
+                    ))
+                
+                # Add exam
+                if record_data.get('esame_obiettivo'):
+                    clinical_data.append(TextData(
+                        data_id=str(uuid.uuid4()),
+                        patient_id=record_data['patient_id'],
+                        timestamp=datetime.now(),
+                        source=DataSource.MANUAL,
+                        text_content=record_data['esame_obiettivo'],
+                        language='it',
+                        document_type='physical_exam'
+                    ))
+                
+                # Create patient record
+                new_record = PatientRecord(
+                    patient=patient,
+                    clinical_data=clinical_data,
+                    encounter_id=str(uuid.uuid4()),
+                    encounter_timestamp=datetime.fromisoformat(record_data['encounter_timestamp']),
+                    priority=record_data.get('priority', 'routine'),
+                    chief_complaint=record_data.get('chief_complaint', ''),
+                    current_medications=record_data.get('current_medications', []),
+                    metadata={
+                        'source': 'GUI Clinical Record Form',
+                        'tipo_episodio': record_data.get('tipo_episodio', ''),
+                        'vital_signs': record_data.get('vital_signs', {}),
+                        'diagnosis': record_data.get('diagnosis', ''),
+                        'treatment_plan': record_data.get('treatment_plan', ''),
+                        'notes': record_data.get('notes', '')
+                    }
+                )
+                
+                # Save to database
+                if self.db.save_patient_record(new_record):
+                    self.log(f"✓ Scheda clinica salvata nel database")
+                    messagebox.showinfo("Successo", "Scheda clinica salvata con successo!")
+                else:
+                    self.log(f"⚠ Errore nel salvare la scheda clinica")
+                    messagebox.showerror("Errore", "Errore nel salvare la scheda clinica")
+            
+            except Exception as e:
+                self.log(f"❌ Errore: {e}")
+                messagebox.showerror("Errore", f"Errore nel salvare la scheda clinica:\n{e}")
+        
+        # Open clinical record form
+        record_form = ClinicalRecordDialog(self.root, patient_info=patient_info, callback=on_record_saved)
+    
+    def open_add_record_form(self):
+        """Open form to add clinical record - asks for patient first."""
+        if not self.db_connected or not self.db:
+            messagebox.showwarning(
+                "Database Non Connesso",
+                "Connetti al database MongoDB prima di aggiungere una scheda clinica."
+            )
+            return
+        
+        # First, ask for patient fiscal code
+        fiscal_code = tk.simpledialog.askstring(
+            "Codice Fiscale",
+            "Inserisci il Codice Fiscale del paziente:",
+            parent=self.root
+        )
+        
+        if not fiscal_code:
+            return
+        
+        fiscal_code = fiscal_code.strip().upper()
+        
+        try:
+            # Get patient from database
+            patient = self.db.get_patient(fiscal_code)
+            
+            if not patient:
+                messagebox.showerror(
+                    "Paziente Non Trovato",
+                    f"Nessun paziente trovato con Codice Fiscale: {fiscal_code}"
+                )
+                return
+            
+            self.log(f"✓ Paziente trovato: {patient.nome} {patient.cognome}")
+            
+            # Prepare patient data dict for the form
+            patient_data = {
+                "patient_id": patient.patient_id,
+                "nome": patient.nome,
+                "cognome": patient.cognome,
+                "codice_fiscale": patient.codice_fiscale
+            }
+            
+            def on_record_saved(record_data):
+                """Callback when record is saved."""
+                self.log(f"📋 Nuova scheda clinica creata")
+                
+                try:
+                    # Save to database
+                    from src.models.patient import PatientRecord
+                    from src.models.clinical_data import TextData, DataSource
+                    import uuid
+                    
+                    # Create clinical data
+                    clinical_data = []
+                    
+                    # Add chief complaint
+                    if record_data.get('chief_complaint'):
+                        clinical_data.append(TextData(
+                            data_id=str(uuid.uuid4()),
+                            patient_id=patient.patient_id,
+                            timestamp=datetime.now(),
+                            source=DataSource.MANUAL,
+                            text_content=record_data['chief_complaint'],
+                            language='it',
+                            document_type='chief_complaint'
+                        ))
+                    
+                    # Add symptoms
+                    if record_data.get('symptoms'):
+                        clinical_data.append(TextData(
+                            data_id=str(uuid.uuid4()),
+                            patient_id=patient.patient_id,
+                            timestamp=datetime.now(),
+                            source=DataSource.MANUAL,
+                            text_content=record_data['symptoms'],
+                            language='it',
+                            document_type='symptoms'
+                        ))
+                    
+                    # Add physical exam
+                    if record_data.get('physical_exam'):
+                        clinical_data.append(TextData(
+                            data_id=str(uuid.uuid4()),
+                            patient_id=patient.patient_id,
+                            timestamp=datetime.now(),
+                            source=DataSource.MANUAL,
+                            text_content=record_data['physical_exam'],
+                            language='it',
+                            document_type='physical_exam'
+                        ))
+                    
+                    # Add diagnosis
+                    if record_data.get('diagnosis'):
+                        clinical_data.append(TextData(
+                            data_id=str(uuid.uuid4()),
+                            patient_id=patient.patient_id,
+                            timestamp=datetime.now(),
+                            source=DataSource.MANUAL,
+                            text_content=record_data['diagnosis'],
+                            language='it',
+                            document_type='diagnosis'
+                        ))
+                    
+                    # Create patient record
+                    new_record = PatientRecord(
+                        patient=patient,
+                        clinical_data=clinical_data,
+                        encounter_id=str(uuid.uuid4()),
+                        encounter_timestamp=datetime.fromisoformat(record_data['encounter_timestamp']),
+                        priority=record_data.get('priority', 'routine'),
+                        chief_complaint=record_data.get('chief_complaint', ''),
+                        current_medications=[],
+                        metadata={
+                            'source': 'GUI Add Record Form',
+                            'vital_signs': record_data.get('vital_signs', {}),
+                            'diagnosis': record_data.get('diagnosis', ''),
+                            'treatment_plan': record_data.get('treatment_plan', ''),
+                            'notes': record_data.get('notes', '')
+                        }
+                    )
+                    
+                    # Save to database
+                    if self.db.save_patient_record(new_record):
+                        self.log(f"✓ Scheda clinica salvata nel database")
+                        
+                        # Automatically refresh and display the updated patient data in main panels
+                        self.log(f"📊 Aggiornamento dati paziente nella schermata principale...")
+                        
+                        # Fetch updated patient and records from database
+                        updated_patient = self.db.get_patient(patient.codice_fiscale)
+                        updated_records = self.db.get_patient_records(patient.codice_fiscale)
+                        
+                        # Display in main GUI panels
+                        if updated_patient:
+                            self._display_patient_in_panels(updated_patient, updated_records)
+                            self.log(f"✓ Dati paziente aggiornati nella schermata principale")
+                        
+                        messagebox.showinfo("Successo", 
+                            "Scheda clinica salvata con successo!\n\n"
+                            "I dati aggiornati sono ora visibili nella schermata principale.")
+                    else:
+                        self.log(f"⚠ Errore nel salvare la scheda clinica")
+                        messagebox.showerror("Errore", "Errore nel salvare la scheda clinica")
+                
+                except Exception as e:
+                    self.log(f"❌ Errore: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    messagebox.showerror("Errore", f"Errore nel salvare la scheda clinica:\n{e}")
+            
+            # Open add record form with patient data
+            add_form = AddRecordDialog(self.root, patient_data=patient_data, callback=on_record_saved)
+        
+        except Exception as e:
+            self.log(f"❌ Errore: {e}")
+            messagebox.showerror("Errore", f"Errore nella ricerca del paziente:\n{e}")
+    
+    def display_patient_records(self, patient):
+        """Display patient information and their clinical records."""
+        self.patient_info_text['state'] = 'normal'
+        self.patient_info_text.delete(1.0, tk.END)
+        
+        # Display patient info
+        info_text = f"""PAZIENTE: {patient.nome} {patient.cognome}
+Codice Fiscale: {patient.codice_fiscale}
+Data di Nascita: {patient.data_nascita.strftime('%d/%m/%Y')}
+Comune di Nascita: {patient.comune_nascita}
+Età: {patient.age if patient.age else 'N/A'}
+
+ALLERGIE:
+"""
+        for allergia in patient.allergie:
+            info_text += f"• {allergia}\n"
+        
+        info_text += "\nMALATTIE PERMANENTI:\n"
+        for malattia in patient.malattie_permanenti:
+            info_text += f"• {malattia}\n"
+        
+        self.patient_info_text.insert(1.0, info_text)
+        self.patient_info_text['state'] = 'disabled'
+        
+        # Get and display clinical records
+        try:
+            records = self.db.get_patient_records(patient.patient_id)
+            
+            self.results_text['state'] = 'normal'
+            self.results_text.delete(1.0, tk.END)
+            
+            if records:
+                results_text = f"📋 SCHEDE CLINICHE ({len(records)} totali)\n{'='*60}\n\n"
+                
+                for i, record in enumerate(records, 1):
+                    results_text += f"SCHEDA #{i}\n"
+                    results_text += f"Data: {record.encounter_timestamp.strftime('%d/%m/%Y %H:%M')}\n"
+                    results_text += f"Tipo: {record.metadata.get('tipo_episodio', 'N/A')}\n"
+                    results_text += f"Priorità: {record.priority}\n"
+                    results_text += f"Motivo: {record.chief_complaint}\n"
+                    
+                    # Vital signs
+                    vital_signs = record.metadata.get('vital_signs', {})
+                    if vital_signs and any(vital_signs.values()):
+                        results_text += "\nParametri Vitali:\n"
+                        if vital_signs.get('blood_pressure'):
+                            results_text += f"  - Pressione: {vital_signs['blood_pressure']}\n"
+                        if vital_signs.get('heart_rate'):
+                            results_text += f"  - Freq. Cardiaca: {vital_signs['heart_rate']}\n"
+                        if vital_signs.get('temperature'):
+                            results_text += f"  - Temperatura: {vital_signs['temperature']}\n"
+                        if vital_signs.get('spo2'):
+                            results_text += f"  - SpO2: {vital_signs['spo2']}\n"
+                    
+                    if record.metadata.get('diagnosis'):
+                        results_text += f"\nDiagnosi: {record.metadata['diagnosis']}\n"
+                    
+                    if record.metadata.get('treatment_plan'):
+                        results_text += f"Piano Terapeutico: {record.metadata['treatment_plan']}\n"
+                    
+                    results_text += "\n" + "-"*60 + "\n\n"
+                
+                self.results_text.insert(1.0, results_text)
+                self.log(f"✓ Visualizzate {len(records)} schede cliniche")
+            else:
+                self.results_text.insert(1.0, "Nessuna scheda clinica trovata per questo paziente.")
+            
+            self.results_text['state'] = 'disabled'
+            
+            # Enable button to add new clinical record
+            self.status_var.set(f"Cartella clinica di: {patient.nome} {patient.cognome}")
+        
+        except Exception as e:
+            self.log(f"❌ Errore nel caricamento delle schede cliniche: {e}")
+            messagebox.showerror("Errore", f"Errore nel caricamento delle schede cliniche:\n{e}")
     
     def convert_form_data_to_patient(self, patient_data):
         """
@@ -1114,19 +1414,43 @@ nella directory del progetto.
         Returns:
             Patient object
         """
+        # Log received data for debugging
+        self.log(f"Converting form data to patient: {patient_data.keys()}")
+        
         # Parse date of birth
         dob_str = patient_data.get('data_nascita', patient_data.get('date_of_birth', ''))
-        try:
-            # Try format YYYY-MM-DD
-            if '-' in dob_str:
-                dob = datetime.strptime(dob_str, '%Y-%m-%d')
-            # Try format DD/MM/YYYY
-            elif '/' in dob_str:
-                dob = datetime.strptime(dob_str, '%d/%m/%Y')
-            else:
-                dob = datetime.now()
-        except:
-            dob = datetime.now()
+        dob = None
+        if dob_str:
+            try:
+                # Try format YYYY-MM-DD
+                if '-' in dob_str:
+                    dob = datetime.strptime(dob_str, '%Y-%m-%d')
+                    self.log(f"✓ Parsed date of birth (YYYY-MM-DD): {dob}")
+                # Try format DD/MM/YYYY
+                elif '/' in dob_str:
+                    dob = datetime.strptime(dob_str, '%d/%m/%Y')
+                    self.log(f"✓ Parsed date of birth (DD/MM/YYYY): {dob}")
+            except Exception as e:
+                self.log(f"❌ Error parsing date of birth '{dob_str}': {e}")
+        
+        # If still None, use a default but log warning
+        if not dob:
+            self.log(f"⚠ No valid date of birth provided, using default")
+            dob = datetime(1900, 1, 1)
+        
+        # Parse date of death if present
+        dod = None
+        dod_str = patient_data.get('data_decesso', '')
+        if dod_str:
+            try:
+                # Try format YYYY-MM-DD
+                if '-' in dod_str:
+                    dod = datetime.strptime(dod_str, '%Y-%m-%d')
+                # Try format DD/MM/YYYY
+                elif '/' in dod_str:
+                    dod = datetime.strptime(dod_str, '%d/%m/%Y')
+            except:
+                dod = None
         
         # Map gender
         gender_map = {
@@ -1136,19 +1460,27 @@ nella directory del progetto.
         }
         gender_value = gender_map.get(patient_data.get('gender', 'M'), Gender.UNKNOWN)
         
+        # Extract all fields with logging
+        nome = patient_data.get('nome', '')
+        cognome = patient_data.get('cognome', '')
+        comune_nascita = patient_data.get('comune_nascita', '')
+        codice_fiscale = patient_data.get('codice_fiscale', '')
+        
+        self.log(f"Creating Patient object: {nome} {cognome}, CF: {codice_fiscale}, Birth: {comune_nascita}")
+        
         # Create Patient object with new fields
         patient = Patient(
-            patient_id=patient_data.get('patient_id', ''),
-            nome=patient_data.get('nome', ''),
-            cognome=patient_data.get('cognome', ''),
+            patient_id=patient_data.get('patient_id', codice_fiscale),
+            nome=nome,
+            cognome=cognome,
             data_nascita=dob,
-            comune_nascita=patient_data.get('comune_nascita', ''),
-            codice_fiscale=patient_data.get('codice_fiscale', ''),
-            data_decesso=None,  # Optional
+            comune_nascita=comune_nascita,
+            codice_fiscale=codice_fiscale,
+            data_decesso=dod,
             allergie=patient_data.get('allergie', []),
             malattie_permanenti=patient_data.get('malattie_permanenti', []),
             gender=gender_value,
-            medical_record_number=patient_data.get('medical_record_number', ''),
+            medical_record_number=codice_fiscale,  # Use CF as MRN
             age=None,  # Will be calculated
             ethnicity=None,
             primary_language='it'
@@ -1156,6 +1488,7 @@ nella directory del progetto.
         
         # Calculate age
         patient.calculate_age()
+        self.log(f"✓ Patient object created successfully - Age: {patient.age}")
         
         return patient
     
@@ -1483,13 +1816,31 @@ Storia Clinica:
                 self.log(f"❌ Paziente non trovato: {fiscal_code}")
                 return
             
+            # DEBUG: Check what was retrieved
+            self.log(f"=== DEBUG SEARCH RESULT ===")
+            self.log(f"Search.nome: '{patient.nome}'")
+            self.log(f"Search.cognome: '{patient.cognome}'")
+            self.log(f"Search.codice_fiscale: '{patient.codice_fiscale}'")
+            self.log(f"Search.comune_nascita: '{patient.comune_nascita}'")
+            self.log(f"Search.data_nascita: {patient.data_nascita}")
+            
+            # If patient has empty critical fields, it means database has corrupted data
+            if not patient.nome or not patient.cognome:
+                self.log(f"⚠️ ERRORE: Paziente nel database ha campi vuoti!")
+                messagebox.showerror(
+                    "Dati Corrotti",
+                    f"Il paziente {fiscal_code} è presente nel database ma ha dati incompleti.\n\n"
+                    "Per favore, inserisci nuovamente i dati del paziente usando il form."
+                )
+                return
+            
             # Get all patient records
             records = self.db.get_patient_records(fiscal_code, limit=1000)
             
             self.log(f"✓ Paziente trovato con {len(records)} schede cliniche")
             
-            # Create search results window
-            self._show_patient_details_window(patient, records)
+            # Display in main GUI panels
+            self._display_patient_in_panels(patient, records)
             
         except Exception as e:
             self.log(f"❌ Errore durante ricerca: {e}")
@@ -1500,18 +1851,151 @@ Storia Clinica:
                 f"Si è verificato un errore durante la ricerca:\n\n{e}"
             )
     
+    def _display_patient_in_panels(self, patient, records):
+        """
+        Display patient details and records in the main GUI panels.
+        
+        Args:
+            patient: Patient object
+            records: List of patient records
+        """
+        # Update the LabelFrame title to show patient's reserved area
+        self.patient_info_frame.configure(
+            text=f"👤 Area Riservata: {patient.nome} {patient.cognome} - {patient.codice_fiscale}"
+        )
+        
+        # Display patient info in left panel
+        self.patient_info_text['state'] = 'normal'
+        self.patient_info_text.delete(1.0, tk.END)
+        
+        # Translate gender to Italian
+        gender_translation = {
+            'male': 'Maschio',
+            'female': 'Femmina',
+            'other': 'Altro',
+            'unknown': 'Non specificato'
+        }
+        
+        # Simple list format without decorative elements
+        patient_info = f"""Nome: {patient.nome}
+Cognome: {patient.cognome}
+Codice Fiscale: {patient.codice_fiscale}
+Data di Nascita: {patient.data_nascita.strftime('%d/%m/%Y') if patient.data_nascita else 'N/A'}
+Comune di Nascita: {patient.comune_nascita}
+Età: {patient.age if patient.age else 'N/A'} anni
+"""
+        
+        if patient.data_decesso:
+            patient_info += f"Data Decesso: {patient.data_decesso.strftime('%d/%m/%Y')}\n"
+        
+        if patient.gender:
+            gender_it = gender_translation.get(patient.gender.value.lower(), patient.gender.value)
+            patient_info += f"Sesso: {gender_it}\n"
+        
+        patient_info += f"\nAllergie:\n"
+        if patient.allergie and len(patient.allergie) > 0:
+            for allergia in patient.allergie:
+                patient_info += f"  - {allergia}\n"
+        else:
+            patient_info += "  Nessuna allergia registrata\n"
+        
+        patient_info += f"\nMalattie Permanenti:\n"
+        if patient.malattie_permanenti and len(patient.malattie_permanenti) > 0:
+            for malattia in patient.malattie_permanenti:
+                patient_info += f"  - {malattia}\n"
+        else:
+            patient_info += "  Nessuna malattia permanente registrata\n"
+        
+        self.patient_info_text.insert(1.0, patient_info)
+        self.patient_info_text['state'] = 'disabled'
+        
+        # Display clinical records in right panel (diagnosis_text)
+        self.diagnosis_text['state'] = 'normal'
+        self.diagnosis_text.delete(1.0, tk.END)
+        
+        records_info = f"""📋 CARTELLA CLINICA - SCHEDE CLINICHE
+{'='*60}
+
+Totale Schede: {len(records)}
+
+"""
+        
+        if records and len(records) > 0:
+            for idx, record in enumerate(records, 1):
+                encounter_date = record.get('encounter_timestamp')
+                date_str = encounter_date.strftime('%d/%m/%Y %H:%M:%S') if encounter_date else 'N/A'
+                
+                records_info += f"""{'─'*60}
+SCHEDA #{idx}
+{'─'*60}
+📅 Data Visita:      {date_str}
+🔖 Encounter ID:     {record.get('encounter_id', 'N/A')}
+⚡ Priorità:         {record.get('priority', 'routine').upper()}
+
+"""
+                
+                # Chief complaint
+                chief_complaint = record.get('chief_complaint', '')
+                if chief_complaint:
+                    records_info += f"🎯 Motivo Principale:\n{chief_complaint}\n\n"
+                
+                # Metadata
+                metadata = record.get('metadata', {})
+                
+                # Vital signs
+                vital_signs = metadata.get('vital_signs', {})
+                if vital_signs and any(vital_signs.values()):
+                    records_info += "🩺 PARAMETRI VITALI:\n"
+                    if vital_signs.get('blood_pressure'):
+                        records_info += f"  • Pressione: {vital_signs['blood_pressure']}\n"
+                    if vital_signs.get('heart_rate'):
+                        records_info += f"  • Freq. Cardiaca: {vital_signs['heart_rate']} bpm\n"
+                    if vital_signs.get('temperature'):
+                        records_info += f"  • Temperatura: {vital_signs['temperature']} °C\n"
+                    if vital_signs.get('respiratory_rate'):
+                        records_info += f"  • Freq. Respiratoria: {vital_signs['respiratory_rate']} atti/min\n"
+                    if vital_signs.get('spo2'):
+                        records_info += f"  • SpO2: {vital_signs['spo2']}%\n"
+                    records_info += "\n"
+                
+                # Diagnosis
+                diagnosis = metadata.get('diagnosis', '')
+                if diagnosis:
+                    records_info += f"🔬 DIAGNOSI:\n{diagnosis}\n\n"
+                
+                # Treatment plan
+                treatment = metadata.get('treatment_plan', '')
+                if treatment:
+                    records_info += f"💊 PIANO TERAPEUTICO:\n{treatment}\n\n"
+                
+                # Notes
+                notes = metadata.get('notes', '')
+                if notes:
+                    records_info += f"📝 NOTE:\n{notes}\n\n"
+                
+                records_info += "\n"
+        else:
+            records_info += "Nessuna scheda clinica presente per questo paziente.\n"
+            records_info += "Usa il pulsante 'Aggiungi Scheda' per creare una nuova scheda.\n"
+        
+        self.diagnosis_text.insert(1.0, records_info)
+        self.diagnosis_text['state'] = 'disabled'
+        
+        # Update status
+        self.status_var.set(f"✓ Paziente: {patient.nome} {patient.cognome} - {len(records)} schede cliniche")
+    
     def _show_patient_details_window(self, patient, records):
         """
+        DEPRECATED: Use _display_patient_in_panels instead.
         Show patient details and records in a dedicated window.
         
         Args:
             patient: Patient object
             records: List of patient records
         """
-        # Create new window
-        details_window = tk.Toplevel(self.root)
-        details_window.title(f"📋 Cartella Clinica - {patient.patient_id}")
-        details_window.geometry("1000x700")
+        # This method is kept for backward compatibility but should not be used
+        # Redirect to panel display
+        self._display_patient_in_panels(patient, records)
         
         # Main container
         main_container = ttk.Frame(details_window, padding=20)
