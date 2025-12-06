@@ -410,6 +410,150 @@ class MongoDBPatientRepository:
             logger.error(f"Error finding patients: {e}")
             return []
     
+    def find_by_fiscal_code(self, codice_fiscale: str) -> Optional[Dict[str, Any]]:
+        """
+        Find patient by fiscal code and return as dictionary.
+        
+        Args:
+            codice_fiscale: Patient fiscal code
+            
+        Returns:
+            Patient dictionary or None if not found
+        """
+        try:
+            patient = self.get_patient(codice_fiscale)
+            if patient:
+                # Convert Patient object to dictionary
+                patient_dict = {
+                    'patient_id': patient.patient_id,
+                    'nome': patient.nome,
+                    'cognome': patient.cognome,
+                    'codice_fiscale': patient.codice_fiscale,
+                    'data_nascita': patient.data_nascita.strftime('%Y-%m-%d') if patient.data_nascita else None,
+                    'sesso': patient.gender.value if patient.gender else None,
+                    'luogo_nascita': patient.comune_nascita,
+                    'indirizzo': getattr(patient, 'indirizzo', None),
+                    'telefono': getattr(patient, 'telefono', None),
+                    'email': getattr(patient, 'email', None),
+                    'cartelle_cliniche': self.get_patient_clinical_records(codice_fiscale)
+                }
+                return patient_dict
+            return None
+        except Exception as e:
+            logger.error(f"Error finding patient by fiscal code: {e}")
+            return None
+    
+    def search_by_name(self, nome: str, cognome: str) -> List[Dict[str, Any]]:
+        """
+        Search patients by name and return as dictionaries.
+        
+        Args:
+            nome: Patient first name
+            cognome: Patient last name
+            
+        Returns:
+            List of patient dictionaries
+        """
+        try:
+            patients = self.find_patients_by_name(nome, cognome)
+            return [
+                {
+                    'patient_id': p.patient_id,
+                    'nome': p.nome,
+                    'cognome': p.cognome,
+                    'codice_fiscale': p.codice_fiscale,
+                    'data_nascita': p.data_nascita.strftime('%Y-%m-%d') if p.data_nascita else None,
+                    'sesso': p.gender.value if p.gender else None,
+                    'luogo_nascita': p.comune_nascita
+                }
+                for p in patients
+            ]
+        except Exception as e:
+            logger.error(f"Error searching patients by name: {e}")
+            return []
+    
+    def get_patient_clinical_records(self, codice_fiscale: str) -> List[Dict[str, Any]]:
+        """
+        Get all clinical records for a patient.
+        
+        Args:
+            codice_fiscale: Patient fiscal code
+            
+        Returns:
+            List of clinical records
+        """
+        try:
+            # Search in patient_records collection
+            records = self.patient_records_collection.find(
+                {"patient.codice_fiscale": codice_fiscale}
+            ).sort("encounter_timestamp", -1)
+            
+            return [
+                {
+                    'encounter_id': r.get('encounter_id'),
+                    'timestamp': r.get('encounter_timestamp'),
+                    'chief_complaint': r.get('chief_complaint'),
+                    'symptoms': r.get('metadata', {}).get('symptoms'),
+                    'diagnosis': r.get('metadata', {}).get('diagnosis'),
+                    'treatment': r.get('metadata', {}).get('treatment'),
+                    'notes': r.get('metadata', {}).get('notes'),
+                    'vital_signs': r.get('metadata', {}).get('vital_signs', {}),
+                    'priority': r.get('priority')
+                }
+                for r in records
+            ]
+        except Exception as e:
+            logger.error(f"Error getting patient records: {e}")
+            return []
+    
+    def add_clinical_record(self, codice_fiscale: str, record: Dict[str, Any]) -> bool:
+        """
+        Add a clinical record to a patient.
+        
+        Args:
+            codice_fiscale: Patient fiscal code
+            record: Clinical record data
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            patient = self.get_patient(codice_fiscale)
+            if not patient:
+                logger.error(f"Patient not found: {codice_fiscale}")
+                return False
+            
+            # Create patient record document
+            record_doc = {
+                'encounter_id': f"ENC-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                'patient': {
+                    'patient_id': patient.patient_id,
+                    'nome': patient.nome,
+                    'cognome': patient.cognome,
+                    'codice_fiscale': patient.codice_fiscale
+                },
+                'chief_complaint': record.get('chief_complaint'),
+                'encounter_timestamp': datetime.now(),
+                'priority': 'routine',
+                'metadata': {
+                    'symptoms': record.get('symptoms'),
+                    'diagnosis': record.get('diagnosis'),
+                    'treatment': record.get('treatment'),
+                    'notes': record.get('notes'),
+                    'vital_signs': record.get('vital_signs', {}),
+                    'lab_results': record.get('lab_results', []),
+                    'imaging': record.get('imaging', [])
+                },
+                'created_at': datetime.now()
+            }
+            
+            self.patient_records_collection.insert_one(record_doc)
+            logger.info(f"Added clinical record for patient: {codice_fiscale}")
+            return True
+        except Exception as e:
+            logger.error(f"Error adding clinical record: {e}")
+            return False
+    
     # Patient Record operations
     
     def save_patient_record(self, record: PatientRecord) -> bool:

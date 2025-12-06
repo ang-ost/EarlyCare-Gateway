@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}MAV - Medical Access & Vision{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="header-title">
+                    <i class="fas fa-hospital"></i> MAV
+                </h1>
+                <span class="header-subtitle">Medical Access & Vision</span>
+            </div>
+            <div class="header-right">
+                <div class="status-indicator">
+                    <span class="status-dot {% if db_connected %}status-success{% else %}status-danger{% endif %}"></span>
+                    <span class="status-text">
+                        {% if db_connected %}Database Connesso{% else %}Database Non Connesso{% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-content">
+            <a href="{{ url_for('index') }}" class="nav-link">
+                <i class="fas fa-home"></i> Home
+            </a>
+            <a href="#" onclick="openPatientSearch()" class="nav-link">
+                <i class="fas fa-search"></i> Cerca Paziente
+            </a>
+            <a href="#" onclick="openPatientForm()" class="nav-link">
+                <i class="fas fa-user-plus"></i> Nuovo Paziente
+            </a>
+            <a href="#" onclick="openAddRecordForm()" class="nav-link">
+                <i class="fas fa-file-medical"></i> Aggiungi Scheda
+            </a>
+            <a href="#" onclick="exportPatientData()" class="nav-link" id="nav-export">
+                <i class="fas fa-download"></i> Esporta
+            </a>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <p>&copy; 2025 EarlyCare Gateway - MAV Medical Access & Vision</p>
+        </div>
+    </footer>
+
+    <!-- Modals Container -->
+    <div id="modals-container"></div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin fa-3x"></i>
+            <p>Caricamento in corso...</p>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
