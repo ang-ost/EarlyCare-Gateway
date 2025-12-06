@@ -121,7 +121,7 @@ class EarlyCareGUI:
         file_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="File", menu=file_menu)
         file_menu.add_command(label="🔍 Cerca Paziente...", command=self.open_patient_search)
-        file_menu.add_command(label="📋 Nuova Scheda Clinica...", command=self.open_clinical_record_form)
+        file_menu.add_command(label="📋 Aggiungi Scheda Clinica...", command=self.open_add_record_form)
         file_menu.add_separator()
         file_menu.add_command(label="📝 Inserisci Nuovo Paziente...", command=self.open_patient_form)
         file_menu.add_separator()
@@ -1085,7 +1085,7 @@ nella directory del progetto.
         
         def on_record_saved(record_data):
             """Callback when clinical record is saved."""
-            self.log(f"📋 Nuova scheda clinica creata per paziente: {record_data.get('patient_id', '')}")
+            self.log(f"📋 Scheda clinica aggiunta per paziente: {record_data.get('patient_id', '')}")
             
             try:
                 # Save to database
