@@ -252,8 +252,59 @@ def check_auth():
 
 @app.route('/')
 def index():
-    """Home page."""
+    """Home page - redirect to login if not authenticated."""
+    if 'doctor_id' not in session:
+        return render_template('login.html')
     return render_template('index.html', db_connected=db_connected)
+
+
+@app.route('/profile')
+def profile():
+    """Doctor profile page."""
+    if 'doctor_id' not in session:
+        return render_template('login.html')
+    
+    try:
+        doctor_data = db.find_doctor_by_id(session['doctor_id'])
+        if not doctor_data:
+            session.clear()
+            return render_template('login.html')
+        
+        return render_template('profile.html', doctor=doctor_data, db_connected=db_connected)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/auth/delete-account', methods=['POST'])
+@require_login
+def delete_account():
+    """Delete doctor account."""
+    try:
+        doctor_id = session['doctor_id']
+        password = request.json.get('password')
+        
+        if not password:
+            return jsonify({'error': 'Password richiesta'}), 400
+        
+        # Verify password before deletion
+        doctor_data = db.find_doctor_by_id(doctor_id)
+        if not doctor_data:
+            return jsonify({'error': 'Medico non trovato'}), 404
+        
+        # doctor_data is a dict, use Doctor.verify_password static method
+        if not Doctor.verify_password(password, doctor_data['password_hash']):
+            return jsonify({'error': 'Password non corretta'}), 401
+        
+        # Delete the account
+        db.delete_doctor_by_id(doctor_id)
+        
+        # Clear session
+        session.clear()
+        
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        print(f"Error deleting account: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/patient/search', methods=['POST'])

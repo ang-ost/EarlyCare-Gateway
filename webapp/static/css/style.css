@@ -1,8 +1,8 @@
 /* EarlyCare Gateway - Web App Styles */
 
 :root {
-    --primary: #2c3e50;
-    --secondary: #3498db;
+    --primary: #667eea;
+    --secondary: #764ba2;
     --success: #27ae60;
     --danger: #e74c3c;
     --warning: #f39c12;
@@ -30,10 +30,10 @@ body {
 
 /* Header */
 .header {
-    background: linear-gradient(135deg, var(--primary), var(--dark));
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: var(--white);
     padding: 1.5rem 2rem;
-    box-shadow: var(--box-shadow);
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
 }
 
 .header-content {
@@ -260,8 +260,8 @@ body {
 
 /* Navigation */
 .navbar {
-    background-color: var(--white);
-    box-shadow: var(--box-shadow);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.15);
     position: sticky;
     top: 0;
     z-index: 100;
@@ -277,15 +277,15 @@ body {
 
 .nav-link {
     padding: 1rem 1.5rem;
-    color: var(--dark);
+    color: white;
     text-decoration: none;
     transition: all 0.3s;
     border-bottom: 3px solid transparent;
 }
 
 .nav-link:hover {
-    background-color: var(--light);
-    border-bottom-color: var(--secondary);
+    background-color: rgba(255, 255, 255, 0.15);
+    border-bottom-color: white;
 }
 
 .nav-link i {
@@ -1226,7 +1226,409 @@ input[type="radio"]:focus {
     background-color: rgba(255, 255, 255, 0.3);
 }
 
+/* ========== DOCTOR DROPDOWN MENU ========== */
+
+.doctor-dropdown {
+    position: relative;
+    display: none;
+    align-items: center;
+    gap: 1rem;
+    margin-left: 2rem;
+    padding-left: 2rem;
+    border-left: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.doctor-profile-btn {
+    background: none;
+    border: none;
+    color: var(--white);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1rem;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.doctor-profile-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.doctor-profile-btn i:last-child {
+    font-size: 0.8rem;
+    transition: transform 0.3s ease;
+}
+
+.doctor-profile-btn.active i:last-child {
+    transform: rotate(180deg);
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: var(--white);
+    border-radius: var(--border-radius);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    min-width: 200px;
+    z-index: 1000;
+    margin-top: 0.5rem;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: all 0.3s ease;
+}
+
+.dropdown-menu.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    color: var(--dark);
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.dropdown-item:first-child {
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+}
+
+.dropdown-item:last-child {
+    border-radius: 0 0 var(--border-radius) var(--border-radius);
+}
+
+.dropdown-item:hover {
+    background-color: var(--light);
+    color: var(--secondary);
+}
+
+.dropdown-divider {
+    margin: 0;
+    border: none;
+    border-top: 1px solid var(--light);
+}
+
+/* ========== PROFILE PAGE ========== */
+
+.profile-container {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 2rem;
+    background: var(--white);
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+}
+
+.profile-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 2px solid var(--light);
+}
+
+.profile-header h1 {
+    margin: 0;
+    color: var(--primary);
+    font-size: 2rem;
+}
+
+.btn-close {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    cursor: pointer;
+    color: var(--gray);
+    transition: all 0.2s ease;
+    padding: 0;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-close:hover {
+    color: var(--danger);
+    transform: scale(1.1);
+}
+
+.profile-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.profile-card {
+    background: var(--light);
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    border: 1px solid #ddd;
+    transition: all 0.3s ease;
+}
+
+.profile-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.card-title {
+    margin: 0 0 1rem 0;
+    color: var(--primary);
+    font-size: 1.3rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.card-title i {
+    color: var(--secondary);
+}
+
+.id-display {
+    background: var(--white);
+    padding: 1.5rem;
+    border-radius: 6px;
+    border: 2px solid var(--secondary);
+    margin-bottom: 1rem;
+}
+
+.id-display label {
+    display: block;
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+    color: var(--primary);
+    font-size: 0.9rem;
+}
+
+.id-box {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e0e0e0;
+}
+
+.doctor-id {
+    font-family: 'Courier New', monospace;
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: var(--secondary);
+    flex: 1;
+    word-break: break-all;
+}
+
+.btn-copy {
+    background: var(--secondary);
+    color: var(--white);
+    border: none;
+    padding: 0.6rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.btn-copy:hover {
+    background: var(--primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn-copy:active {
+    transform: translateY(0);
+}
+
+.id-note {
+    margin: 1rem 0 0 0;
+    padding: 0.75rem;
+    background: #e3f2fd;
+    border-left: 4px solid var(--secondary);
+    color: #1565c0;
+    font-size: 0.9rem;
+    border-radius: 4px;
+}
+
+.info-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.info-item {
+    background: var(--white);
+    padding: 1rem;
+    border-radius: 6px;
+    border: 1px solid #ddd;
+}
+
+.info-item label {
+    display: block;
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.info-item p {
+    margin: 0;
+    color: var(--dark);
+    word-break: break-word;
+}
+
+.badge {
+    display: inline-block;
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.badge-active {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.badge-inactive {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.profile-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+.btn-secondary {
+    background: var(--light);
+    color: var(--dark);
+    border: 1px solid #ddd;
+}
+
+.btn-secondary:hover {
+    background: #d4d4d4;
+}
+
+/* ========== RESPONSIVE DESIGN ========== */
+
+@media (max-width: 1024px) {
+    .doctor-dropdown {
+        margin-left: 1rem;
+        padding-left: 1rem;
+    }
+
+    .dropdown-menu {
+        right: -10px;
+    }
+}
+
+@media (max-width: 768px) {
+    .doctor-dropdown {
+        display: none;
+        margin-left: 0.5rem;
+        padding-left: 0.5rem;
+    }
+
+    .profile-container {
+        margin: 1rem;
+        padding: 1rem;
+    }
+
+    .profile-header {
+        flex-direction: row;
+        margin-bottom: 1rem;
+    }
+
+    .profile-header h1 {
+        font-size: 1.5rem;
+    }
+
+    .info-group {
+        grid-template-columns: 1fr;
+    }
+
+    .profile-actions {
+        flex-direction: column;
+    }
+
+    .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .dropdown-menu {
+        right: -50px;
+        min-width: 180px;
+    }
+}
+
 @media (max-width: 600px) {
+    .header-content {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .header-right {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .doctor-dropdown {
+        width: 100%;
+        margin-left: 0;
+        padding-left: 0;
+        border-left: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
+        padding-top: 1rem;
+        margin-top: 1rem;
+    }
+
+    .doctor-profile-btn {
+        width: 100%;
+        justify-content: space-between;
+    }
+
     .auth-modal-content {
         max-width: 90%;
         padding: 2rem 1.5rem;

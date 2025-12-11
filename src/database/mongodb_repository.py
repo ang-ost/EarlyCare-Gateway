@@ -1093,6 +1093,23 @@ class MongoDBPatientRepository:
             logger.error(f"Error checking doctor ID: {e}")
             return False
 
+    def delete_doctor_by_id(self, doctor_id: str) -> bool:
+        """
+        Delete a doctor by their ID.
+        
+        Args:
+            doctor_id: The doctor ID to delete
+            
+        Returns:
+            True if deletion was successful, False otherwise
+        """
+        try:
+            result = self.doctors_collection.delete_one({'doctor_id': doctor_id})
+            return result.deleted_count > 0
+        except Exception as e:
+            logger.error(f"Error deleting doctor: {e}")
+            return False
+
     def close(self):
         """Close MongoDB connection."""
         if self.client:

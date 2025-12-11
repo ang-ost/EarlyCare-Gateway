@@ -10,9 +10,6 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <!-- Authentication Modal -->
-    {% include 'auth_modal.html' %}
-
     <!-- Header -->
     <header class="header">
         <div class="header-content">
@@ -29,6 +26,23 @@
                         {% if db_connected %}Database Connesso{% else %}Database Non Connesso{% endif %}
                     </span>
                 </div>
+                <!-- Doctor Dropdown -->
+                <div class="doctor-dropdown" id="doctorDropdown">
+                    <button class="doctor-profile-btn" onclick="toggleDoctorDropdown()">
+                        <i class="fas fa-user-circle"></i>
+                        <span id="doctorName">Menu</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div class="dropdown-menu" id="dropdownMenu">
+                        <a href="/profile" class="dropdown-item">
+                            <i class="fas fa-id-card"></i> Il Mio Profilo
+                        </a>
+                        <hr class="dropdown-divider">
+                        <a href="#" onclick="handleLogout(); return false;" class="dropdown-item">
+                            <i class="fas fa-sign-out-alt"></i> Esci
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
     </header>
@@ -37,18 +51,18 @@
     <nav class="navbar">
         <div class="nav-content">
             <a href="{{ url_for('index') }}" class="nav-link">
-                <i class="fas fa-home"></i> Login/Sign-in
+                <i class="fas fa-home"></i> Home
             </a>
-            <a href="#" onclick="checkAuthAndExecute(openPatientSearch); return false;" class="nav-link">
+            <a href="#" onclick="openPatientSearch(); return false;" class="nav-link">
                 <i class="fas fa-search"></i> Cerca Paziente
             </a>
-            <a href="#" onclick="checkAuthAndExecute(openPatientForm); return false;" class="nav-link">
+            <a href="#" onclick="openPatientForm(); return false;" class="nav-link">
                 <i class="fas fa-user-plus"></i> Nuovo Paziente
             </a>
-            <a href="#" onclick="checkAuthAndExecute(openAddRecordForm); return false;" class="nav-link">
+            <a href="#" onclick="openAddRecordForm(); return false;" class="nav-link">
                 <i class="fas fa-file-medical"></i> Aggiungi Scheda
             </a>
-            <a href="#" onclick="checkAuthAndExecute(exportPatientData); return false;" class="nav-link" id="nav-export">
+            <a href="#" onclick="exportPatientData(); return false;" class="nav-link" id="nav-export">
                 <i class="fas fa-download"></i> Esporta
             </a>
         </div>
