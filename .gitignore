@@ -1,10 +1,40 @@
+# File di credenziali personalizzati
 credenziali_db.txt
 Settaggio.txt
+credenzialiMongoDB.txt
+
+# #################################### #
+#  FRONTEND SPECIFIC (VITE / REACT)    #
+# #################################### #
+
+# Dipendenze del frontend (MOLTO IMPORTANTE)
+frontend/node_modules/
+
+# Cartella di build del frontend
+frontend/dist/
+
+# File di cache di Vite
+frontend/.vite/
+
+# Log specifici di npm/yarn/pnpm
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+
+# #################################### #
+#  CONFIGURAZIONE GENERALE & BACKEND   #
+# #################################### #
 
 # Environment variables (IMPORTANT: Never commit credentials!)
 .env
 .env.local
 .env.*.local
+
+# Secrets and configuration
+*.key
+*.pem
+secrets.yaml
 
 # Python
 __pycache__/
@@ -41,7 +71,6 @@ env/
 *.swp
 *.swo
 *~
-.DS_Store
 
 # Testing
 .pytest_cache/
@@ -54,30 +83,21 @@ htmlcov/
 *.log
 logs/
 audit_logs/
+audit.log
+audit_*.log
 
-# Data
+# Data (non tracciare file di dati grezzi)
 data/
 *.csv
 *.xlsx
 *.db
 *.sqlite
 
-# Secrets and configuration
-.env
-.env.local
-*.key
-*.pem
-secrets.yaml
-
 # Clinical data (NEVER commit patient data)
 clinical_data/
 patient_records/
 dicom/
 *.dcm
-
-# Audit files
-audit.log
-audit_*.log
 
 # Temporary files
 tmp/
@@ -101,6 +121,3 @@ docs/_build/
 # Distribution
 *.tar.gz
 *.zip
-
-credenzialiMongoDB.txt
-
