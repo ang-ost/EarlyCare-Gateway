@@ -238,10 +238,27 @@ def logout_doctor():
 def check_auth():
     """Check if user is authenticated."""
     if 'doctor_id' in session:
+        doctor_id = session['doctor_id']
+        try:
+            if db_connected:
+                doctor_data = db.find_doctor_by_id(doctor_id)
+                return jsonify({
+                    'authenticated': True,
+                    'doctor': {
+                        'doctor_id': doctor_id,
+                        'nome': doctor_data.get('nome', ''),
+                        'cognome': doctor_data.get('cognome', ''),
+                        'specializzazione': doctor_data.get('specializzazione', ''),
+                        'ospedale_affiliato': doctor_data.get('ospedale_affiliato', '')
+                    }
+                }), 200
+        except Exception as e:
+            print(f"Error in check_auth: {e}")
+        
         return jsonify({
             'authenticated': True,
             'doctor': {
-                'doctor_id': session['doctor_id'],
+                'doctor_id': doctor_id,
                 'nome': session.get('doctor_nome', ''),
                 'cognome': session.get('doctor_cognome', ''),
                 'specializzazione': session.get('doctor_specializzazione', '')
@@ -438,6 +455,10 @@ def add_clinical_record(fiscal_code):
         return jsonify({'error': 'Database non connesso'}), 500
     
     try:
+        # Get current doctor from session
+        doctor_id = session.get('doctor_id')
+        doctor_data = db.find_doctor(doctor_id) if doctor_id else None
+        
         # Create record
         record = {
             'timestamp': datetime.now().isoformat(),
@@ -450,6 +471,9 @@ def add_clinical_record(fiscal_code):
             'vital_signs': data.get('vital_signs', {}),
             'lab_results': data.get('lab_results', []),
             'imaging': data.get('imaging', []),
+            'doctor_id': doctor_id,
+            'doctor_name': f"{doctor_data.get('nome', '')} {doctor_data.get('cognome', '')}" if doctor_data else 'Sconosciuto',
+            'doctor_specialization': doctor_data.get('specializzazione', '') if doctor_data else ''
         }
         
         # Add to patient
@@ -581,6 +605,28 @@ def export_patient_data(fiscal_code):
         
         return send_file(export_file, as_attachment=True)
         
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/debug/check-doctor/<doctor_id>', methods=['GET'])
+def debug_check_doctor(doctor_id):
+    """DEBUG: Check if a doctor exists in the database."""
+    if not db_connected:
+        return jsonify({'error': 'Database non connesso'}), 500
+    
+    try:
+        doctor = db.find_doctor_by_id(doctor_id)
+        if doctor:
+            return jsonify({
+                'found': True,
+                'doctor_id': doctor.get('doctor_id'),
+                'nome': doctor.get('nome'),
+                'cognome': doctor.get('cognome'),
+                'is_active': doctor.get('is_active')
+            }), 200
+        else:
+            return jsonify({'found': False, 'error': f'Doctor {doctor_id} not found in database'}), 404
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
