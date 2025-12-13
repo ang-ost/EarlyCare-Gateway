@@ -721,20 +721,10 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
             
             <form onSubmit={handleAddRecord}>
               <div className="form-group">
-                <label>Motivo *</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '0.5rem' }}>
-                  <select value={recordFormData.motivo_tipo} onChange={(e) => setRecordFormData({...recordFormData, motivo_tipo: e.target.value})} required>
-                    <option value="Visita">🏥 Visita</option>
-                    <option value="Ricovero">🛏️ Ricovero</option>
-                  </select>
-                  <input 
-                    type="text" 
-                    value={recordFormData.motivo} 
-                    onChange={(e) => setRecordFormData({...recordFormData, motivo: e.target.value})} 
-                    placeholder="Es. Dolore toracico, controllo routine..." 
-                    required 
-                  />
-                </div>
+                <select value={recordFormData.motivo_tipo} onChange={(e) => setRecordFormData({...recordFormData, motivo_tipo: e.target.value})} required style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', borderRadius: '8px', border: '2px solid #e5e7eb' }}>
+                  <option value="Visita">🏥 Visita</option>
+                  <option value="Ricovero">🛏️ Ricovero</option>
+                </select>
               </div>
 
               <div className="form-group">
