@@ -10,6 +10,8 @@ import json
 from datetime import datetime
 import sys
 from functools import wraps
+import zipfile
+import io
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -644,26 +646,70 @@ def get_metrics():
 @app.route('/api/export/<fiscal_code>', methods=['GET'])
 @require_login
 def export_patient_data(fiscal_code):
-    """Export patient data as JSON."""
+    """Export patient data and clinical records as ZIP file."""
     if not db_connected:
         return jsonify({'error': 'Database non connesso'}), 500
     
     try:
+        # Get patient data
         patient_data = db.find_by_fiscal_code(fiscal_code)
         if not patient_data:
             return jsonify({'error': 'Paziente non trovato'}), 404
         
-        # Create export file
-        export_folder = app.config['UPLOAD_FOLDER'] / 'exports'
-        export_folder.mkdir(exist_ok=True)
-        export_file = export_folder / f"{fiscal_code}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        # Get clinical records
+        clinical_records = []
+        try:
+            clinical_records = list(db.get_clinical_records(fiscal_code))
+        except Exception as e:
+            print(f"Warning: Could not load clinical records: {e}")
         
-        with open(export_file, 'w', encoding='utf-8') as f:
-            json.dump(patient_data, f, ensure_ascii=False, indent=2, default=str)
+        # Create ZIP file in memory
+        memory_file = io.BytesIO()
+        with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+            # Add patient info
+            patient_json = json.dumps(patient_data, ensure_ascii=False, indent=2, default=str)
+            zf.writestr('patient_info.json', patient_json)
+            
+            # Add clinical records
+            if clinical_records:
+                records_json = json.dumps(clinical_records, ensure_ascii=False, indent=2, default=str)
+                zf.writestr('clinical_records.json', records_json)
+                
+                # Create individual record files
+                for idx, record in enumerate(clinical_records):
+                    record_filename = f"record_{idx+1}_{record.get('timestamp', 'unknown')}.json"
+                    record_json = json.dumps(record, ensure_ascii=False, indent=2, default=str)
+                    zf.writestr(f"records/{record_filename}", record_json)
+            
+            # Add README
+            readme_content = f"""Cartella Clinica - {patient_data.get('first_name', '')} {patient_data.get('last_name', '')}
+Codice Fiscale: {fiscal_code}
+Data Export: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
+
+Contenuto:
+- patient_info.json: Informazioni anagrafiche del paziente
+- clinical_records.json: Tutte le schede cliniche
+- records/: Schede cliniche individuali
+"""
+            zf.writestr('README.txt', readme_content)
         
-        return send_file(export_file, as_attachment=True)
+        # Seek to beginning of file
+        memory_file.seek(0)
+        
+        # Generate filename
+        filename = f"cartella_clinica_{fiscal_code}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+        
+        return send_file(
+            memory_file,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=filename
+        )
         
     except Exception as e:
+        print(f"Error in export: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 

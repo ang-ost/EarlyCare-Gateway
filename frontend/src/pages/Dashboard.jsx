@@ -49,6 +49,41 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
     onLogout()
   }
 
+  const handleExport = async () => {
+    if (!foundPatient) {
+      setToast({ type: 'warning', message: 'Seleziona prima un paziente', icon: '⚠️' })
+      return
+    }
+
+    try {
+      const fiscalCode = foundPatient.codice_fiscale || foundPatient.fiscal_code
+      const res = await fetch(`/api/export/${fiscalCode}`, {
+        credentials: 'include'
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        setToast({ type: 'error', message: errorData.error || 'Errore durante l\'export', icon: '❌' })
+        return
+      }
+
+      // Download file
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `cartella_clinica_${fiscalCode}_${new Date().toISOString().slice(0,10)}.zip`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+
+      setToast({ type: 'success', message: 'Cartella clinica esportata con successo', icon: '✅' })
+    } catch (err) {
+      setToast({ type: 'error', message: 'Errore di connessione', icon: '❌' })
+    }
+  }
+
   const handlePatientSearch = async (e) => {
     e.preventDefault()
     if (!searchFiscalCode.trim()) {
@@ -257,28 +292,39 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
         borderBottom: '3px solid rgba(102, 126, 234, 0.3)',
         boxShadow: '0 4px 12px rgba(102, 126, 234, 0.2)'
       }}>
-        <a href="#" onClick={(e) => { e.preventDefault() }} style={{
+        <button onClick={() => {
+          if (foundPatient) {
+            handleExport()
+          } else {
+            setToast({ type: 'warning', message: 'Seleziona prima un paziente', icon: '⚠️' })
+          }
+        }} style={{
           flex: 1,
           padding: '1rem 1.5rem',
           color: 'white',
-          textDecoration: 'none',
+          background: 'none',
+          border: 'none',
           borderRight: '1px solid rgba(255,255,255,0.2)',
+          textDecoration: 'none',
           display: 'flex',
           alignItems: 'center',
           gap: '0.75rem',
           fontWeight: '500',
           transition: 'all 0.3s ease',
-          cursor: 'pointer',
+          cursor: foundPatient ? 'pointer' : 'not-allowed',
+          opacity: foundPatient ? 1 : 0.5,
           fontSize: '0.95rem'
         }} onMouseEnter={(e) => {
-          e.currentTarget.style.background = 'rgba(255,255,255,0.15)'
-          e.currentTarget.style.transform = 'translateY(-2px)'
+          if (foundPatient) {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.15)'
+            e.currentTarget.style.transform = 'translateY(-2px)'
+          }
         }} onMouseLeave={(e) => {
           e.currentTarget.style.background = 'none'
           e.currentTarget.style.transform = 'translateY(0)'
         }}>
-          🏠 Home
-        </a>
+          📦 Export
+        </button>
         <button onClick={() => setShowPatientSearch(true)} style={{
           flex: 1,
           padding: '1rem 1.5rem',
