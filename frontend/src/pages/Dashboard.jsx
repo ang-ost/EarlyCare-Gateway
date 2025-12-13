@@ -1,16 +1,19 @@
 import { useState, useEffect } from 'react'
 import Toast from '../components/Toast'
+import DiagnosisModal from '../components/DiagnosisModal'
 
 export default function Dashboard({ user, onNavigate, onLogout }) {
   const [showMenu, setShowMenu] = useState(false)
   const [showPatientForm, setShowPatientForm] = useState(false)
   const [showAddRecordForm, setShowAddRecordForm] = useState(false)
   const [showPatientSearch, setShowPatientSearch] = useState(false)
+  const [showDiagnosisModal, setShowDiagnosisModal] = useState(false)
   
   const [searchFiscalCode, setSearchFiscalCode] = useState('')
   const [foundPatient, setFoundPatient] = useState(null)
   const [clinicalRecords, setClinicalRecords] = useState([])
   const [expandedRecord, setExpandedRecord] = useState(null)
+  const [selectedRecord, setSelectedRecord] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [toast, setToast] = useState(null)
@@ -28,17 +31,18 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
   })
 
   const [recordFormData, setRecordFormData] = useState({
-    tipo_scheda: 'Visita',
-    chief_complaint: '',
+    motivo_tipo: 'Visita',
+    motivo: '',
     symptoms: '',
-    diagnosis: '',
-    treatment: '',
     notes: '',
     blood_pressure: '',
     heart_rate: '',
     temperature: '',
-    oxygen_saturation: ''
+    oxygen_saturation: '',
+    respiratory_rate: ''
   })
+
+  const [recordFiles, setRecordFiles] = useState([])
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
@@ -151,26 +155,28 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
     setLoading(true)
 
     try {
+      const formData = new FormData()
+      formData.append('motivo_tipo', recordFormData.motivo_tipo)
+      formData.append('motivo', recordFormData.motivo)
+      formData.append('symptoms', recordFormData.symptoms)
+      formData.append('notes', recordFormData.notes)
+      formData.append('vital_signs', JSON.stringify({
+        blood_pressure: recordFormData.blood_pressure,
+        heart_rate: recordFormData.heart_rate,
+        temperature: recordFormData.temperature,
+        oxygen_saturation: recordFormData.oxygen_saturation,
+        respiratory_rate: recordFormData.respiratory_rate
+      }))
+      
+      // Aggiungi file
+      recordFiles.forEach((file) => {
+        formData.append('files', file)
+      })
+
       const res = await fetch(`/api/patient/${foundPatient.codice_fiscale}/add-record`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          tipo_scheda: recordFormData.tipo_scheda,
-          chief_complaint: recordFormData.chief_complaint,
-          symptoms: recordFormData.symptoms,
-          diagnosis: recordFormData.diagnosis,
-          treatment: recordFormData.treatment,
-          notes: recordFormData.notes,
-          vital_signs: {
-            blood_pressure: recordFormData.blood_pressure,
-            heart_rate: recordFormData.heart_rate,
-            temperature: recordFormData.temperature,
-            oxygen_saturation: recordFormData.oxygen_saturation
-          },
-          lab_results: [],
-          imaging: []
-        })
+        body: formData
       })
 
       const data = await res.json()
@@ -182,17 +188,17 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
       alert('Scheda aggiunta con successo!')
       setShowAddRecordForm(false)
       setRecordFormData({
-        tipo_scheda: 'Visita',
-        chief_complaint: '',
+        motivo_tipo: 'Visita',
+        motivo: '',
         symptoms: '',
-        diagnosis: '',
-        treatment: '',
         notes: '',
         blood_pressure: '',
         heart_rate: '',
         temperature: '',
-        oxygen_saturation: ''
+        oxygen_saturation: '',
+        respiratory_rate: ''
       })
+      setRecordFiles([])
 
       // Ricarica record
       const recordsRes = await fetch(`/api/patient/${foundPatient.codice_fiscale}/records`, {
@@ -412,18 +418,38 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
 
           {/* Right Panel */}
           <div className="card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', gap: '1rem' }}>
               <h3 style={{ margin: 0, color: '#667eea' }}>📋 Schede Cliniche</h3>
-              <span style={{
-                background: '#667eea',
-                color: 'white',
-                padding: '0.25rem 0.75rem',
-                borderRadius: '9999px',
-                fontSize: '0.85rem',
-                fontWeight: '600'
-              }}>
-                {clinicalRecords.length}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                {selectedRecord !== null && (
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => setShowDiagnosisModal(true)}
+                    style={{
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      border: 'none',
+                      padding: '0.5rem 1rem',
+                      fontSize: '0.9rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      boxShadow: '0 4px 6px rgba(102, 126, 234, 0.3)'
+                    }}
+                  >
+                    🧠 Diagnosi AI
+                  </button>
+                )}
+                <span style={{
+                  background: '#667eea',
+                  color: 'white',
+                  padding: '0.25rem 0.75rem',
+                  borderRadius: '9999px',
+                  fontSize: '0.85rem',
+                  fontWeight: '600'
+                }}>
+                  {clinicalRecords.length}
+                </span>
+              </div>
             </div>
 
             {clinicalRecords.length > 0 ? (
@@ -431,25 +457,62 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                 {clinicalRecords.map((record, idx) => (
                   <div
                     key={idx}
-                    onClick={() => setExpandedRecord(expandedRecord === idx ? null : idx)}
+                    onClick={(e) => {
+                      // Se clicco sul box, seleziono/deseleziono la scheda
+                      if (selectedRecord === idx) {
+                        setSelectedRecord(null)
+                      } else {
+                        setSelectedRecord(idx)
+                      }
+                      // Toggle espansione
+                      setExpandedRecord(expandedRecord === idx ? null : idx)
+                    }}
                     style={{
                       padding: '1rem',
-                      border: '1px solid #e5e7eb',
+                      border: selectedRecord === idx ? '3px solid #667eea' : '1px solid #e5e7eb',
                       borderRadius: '0.5rem',
-                      background: expandedRecord === idx ? '#f0f4ff' : 'white',
+                      background: selectedRecord === idx ? 'linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%)' : (expandedRecord === idx ? '#f0f4ff' : 'white'),
                       cursor: 'pointer',
-                      transition: 'all 0.3s'
+                      transition: 'all 0.3s',
+                      boxShadow: selectedRecord === idx ? '0 4px 12px rgba(102, 126, 234, 0.2)' : 'none',
+                      position: 'relative'
                     }}
                   >
+                    {selectedRecord === idx && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '0.5rem',
+                        right: '0.5rem',
+                        background: '#667eea',
+                        color: 'white',
+                        padding: '0.25rem 0.5rem',
+                        borderRadius: '0.25rem',
+                        fontSize: '0.75rem',
+                        fontWeight: '600',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem'
+                      }}>
+                        ✓ Selezionata
+                      </div>
+                    )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                      <div>
-                        <p style={{ fontWeight: '600', margin: '0 0 0.25rem 0' }}>{record.tipo_scheda}</p>
-                        <p style={{ fontSize: '0.85rem', color: '#667eea', margin: 0 }}>
-                          {new Date(record.timestamp).toLocaleDateString('it-IT')} {new Date(record.timestamp).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                          <span style={{ fontSize: '1.2rem' }}>{record.motivo_tipo === 'Ricovero' ? '🛏️' : '🏥'}</span>
+                          <p style={{ fontWeight: '600', margin: 0 }}>{record.motivo_tipo || record.tipo_scheda}</p>
+                        </div>
+                        {(record.motivo || record.chief_complaint) && (
+                          <p style={{ fontSize: '0.9rem', color: '#374151', margin: '0.25rem 0', fontStyle: 'italic' }}>
+                            {record.motivo || record.chief_complaint}
+                          </p>
+                        )}
+                        <p style={{ fontSize: '0.85rem', color: '#667eea', margin: '0.25rem 0 0 0' }}>
+                          📅 {new Date(record.timestamp).toLocaleDateString('it-IT')} {new Date(record.timestamp).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
                         </p>
                         {record.doctor_name && (
                           <p style={{ fontSize: '0.75rem', color: '#667eea', margin: '0.25rem 0 0 0', fontWeight: '500' }}>
-                            👨‍⚕️ {record.doctor_name}
+                            👨‍⚕️ Dr. {record.doctor_name}
                           </p>
                         )}
                       </div>
@@ -460,11 +523,70 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
 
                     {expandedRecord === idx && (
                       <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb', fontSize: '0.9rem' }}>
-                        {record.chief_complaint && <p><strong>Motivo:</strong> {record.chief_complaint}</p>}
-                        {record.symptoms && <p><strong>Sintomi:</strong> {record.symptoms}</p>}
-                        {record.diagnosis && <p><strong>Diagnosi:</strong> {record.diagnosis}</p>}
-                        {record.treatment && <p><strong>Trattamento:</strong> {record.treatment}</p>}
-                        {record.notes && <p><strong>Note:</strong> {record.notes}</p>}
+                        {record.symptoms && (
+                          <div style={{ marginBottom: '1rem' }}>
+                            <p style={{ fontWeight: '600', color: '#667eea', marginBottom: '0.25rem' }}>🩺 Sintomi:</p>
+                            <p style={{ margin: 0, lineHeight: '1.6' }}>{record.symptoms}</p>
+                          </div>
+                        )}
+                        
+                        {record.vital_signs && Object.keys(record.vital_signs).length > 0 && (
+                          <div style={{ marginBottom: '1rem' }}>
+                            <p style={{ fontWeight: '600', color: '#667eea', marginBottom: '0.5rem' }}>💓 Parametri Vitali:</p>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.85rem' }}>
+                              {record.vital_signs.blood_pressure && <p style={{ margin: 0 }}>🩸 Pressione: {record.vital_signs.blood_pressure}</p>}
+                              {record.vital_signs.heart_rate && <p style={{ margin: 0 }}>❤️ FC: {record.vital_signs.heart_rate}</p>}
+                              {record.vital_signs.temperature && <p style={{ margin: 0 }}>🌡️ Temp: {record.vital_signs.temperature}</p>}
+                              {record.vital_signs.oxygen_saturation && <p style={{ margin: 0 }}>💨 SpO2: {record.vital_signs.oxygen_saturation}</p>}
+                              {record.vital_signs.respiratory_rate && <p style={{ margin: 0 }}>🫁 FR: {record.vital_signs.respiratory_rate}</p>}
+                            </div>
+                          </div>
+                        )}
+
+                        {record.attachments && record.attachments.length > 0 && (
+                          <div style={{ marginBottom: '1rem' }}>
+                            <p style={{ fontWeight: '600', color: '#667eea', marginBottom: '0.5rem' }}>📎 Allegati:</p>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                              {record.attachments.map((file, fileIdx) => (
+                                <div key={fileIdx} style={{
+                                  padding: '0.25rem 0.75rem',
+                                  background: '#f0f4ff',
+                                  borderRadius: '0.25rem',
+                                  fontSize: '0.85rem',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem'
+                                }}>
+                                  <span>📄</span>
+                                  <span>{file.name || file}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {record.notes && (
+                          <div>
+                            <p style={{ fontWeight: '600', color: '#667eea', marginBottom: '0.25rem' }}>📝 Note del Medico:</p>
+                            <p style={{ margin: 0, padding: '0.5rem', background: '#f9fafb', borderRadius: '0.25rem', fontFamily: 'monospace', fontSize: '0.85rem', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                              {record.notes}
+                            </p>
+                          </div>
+                        )}
+
+                        {record.diagnosis && (
+                          <div style={{ marginTop: '1rem' }}>
+                            <p style={{ fontWeight: '600', color: '#667eea', marginBottom: '0.25rem' }}>🔬 Diagnosi:</p>
+                            <p style={{ margin: 0 }}>{record.diagnosis}</p>
+                          </div>
+                        )}
+                        
+                        {record.treatment && (
+                          <div style={{ marginTop: '1rem' }}>
+                            <p style={{ fontWeight: '600', color: '#667eea', marginBottom: '0.25rem' }}>💊 Trattamento:</p>
+                            <p style={{ margin: 0 }}>{record.treatment}</p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -599,60 +721,131 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
             
             <form onSubmit={handleAddRecord}>
               <div className="form-group">
-                <label>Tipo Scheda *</label>
-                <select value={recordFormData.tipo_scheda} onChange={(e) => setRecordFormData({...recordFormData, tipo_scheda: e.target.value})} required>
-                  <option value="Visita">Visita</option>
-                  <option value="Ricovero">Ricovero</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>Motivo Principale *</label>
-                <input type="text" value={recordFormData.chief_complaint} onChange={(e) => setRecordFormData({...recordFormData, chief_complaint: e.target.value})} placeholder="Es. Dolore toracico" required />
+                <label>Motivo *</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '0.5rem' }}>
+                  <select value={recordFormData.motivo_tipo} onChange={(e) => setRecordFormData({...recordFormData, motivo_tipo: e.target.value})} required>
+                    <option value="Visita">🏥 Visita</option>
+                    <option value="Ricovero">🛏️ Ricovero</option>
+                  </select>
+                  <input 
+                    type="text" 
+                    value={recordFormData.motivo} 
+                    onChange={(e) => setRecordFormData({...recordFormData, motivo: e.target.value})} 
+                    placeholder="Es. Dolore toracico, controllo routine..." 
+                    required 
+                  />
+                </div>
               </div>
 
               <div className="form-group">
                 <label>Sintomi *</label>
-                <textarea value={recordFormData.symptoms} onChange={(e) => setRecordFormData({...recordFormData, symptoms: e.target.value})} required rows="3"></textarea>
+                <textarea 
+                  value={recordFormData.symptoms} 
+                  onChange={(e) => setRecordFormData({...recordFormData, symptoms: e.target.value})} 
+                  placeholder="Descrizione dettagliata dei sintomi presentati dal paziente..."
+                  required 
+                  rows="4"
+                ></textarea>
               </div>
 
-              <div className="form-group">
-                <label>Diagnosi</label>
-                <textarea value={recordFormData.diagnosis} onChange={(e) => setRecordFormData({...recordFormData, diagnosis: e.target.value})} rows="2"></textarea>
-              </div>
-
-              <div className="form-group">
-                <label>Trattamento</label>
-                <textarea value={recordFormData.treatment} onChange={(e) => setRecordFormData({...recordFormData, treatment: e.target.value})} rows="2"></textarea>
-              </div>
-
-              <div className="form-group">
-                <label>Note Aggiuntive</label>
-                <textarea value={recordFormData.notes} onChange={(e) => setRecordFormData({...recordFormData, notes: e.target.value})} rows="2"></textarea>
-              </div>
-
-              <h4 style={{ color: '#667eea', marginTop: '1.5rem', marginBottom: '1rem' }}>Parametri Vitali</h4>
+              <h4 style={{ color: '#667eea', marginTop: '1.5rem', marginBottom: '1rem' }}>💓 Parametri Vitali</h4>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
                   <label>Pressione Arteriosa</label>
-                  <input type="text" value={recordFormData.blood_pressure} onChange={(e) => setRecordFormData({...recordFormData, blood_pressure: e.target.value})} placeholder="120/80" />
+                  <input 
+                    type="text" 
+                    value={recordFormData.blood_pressure} 
+                    onChange={(e) => setRecordFormData({...recordFormData, blood_pressure: e.target.value})} 
+                    placeholder="120/80 mmHg" 
+                  />
                 </div>
                 <div className="form-group">
                   <label>Frequenza Cardiaca</label>
-                  <input type="number" value={recordFormData.heart_rate} onChange={(e) => setRecordFormData({...recordFormData, heart_rate: e.target.value})} placeholder="bpm" />
+                  <input 
+                    type="text" 
+                    value={recordFormData.heart_rate} 
+                    onChange={(e) => setRecordFormData({...recordFormData, heart_rate: e.target.value})} 
+                    placeholder="75 bpm" 
+                  />
                 </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
                   <label>Temperatura</label>
-                  <input type="number" step="0.1" value={recordFormData.temperature} onChange={(e) => setRecordFormData({...recordFormData, temperature: e.target.value})} placeholder="°C" />
+                  <input 
+                    type="text" 
+                    value={recordFormData.temperature} 
+                    onChange={(e) => setRecordFormData({...recordFormData, temperature: e.target.value})} 
+                    placeholder="36.5 °C" 
+                  />
                 </div>
                 <div className="form-group">
                   <label>Saturazione O2</label>
-                  <input type="number" value={recordFormData.oxygen_saturation} onChange={(e) => setRecordFormData({...recordFormData, oxygen_saturation: e.target.value})} placeholder="%" />
+                  <input 
+                    type="text" 
+                    value={recordFormData.oxygen_saturation} 
+                    onChange={(e) => setRecordFormData({...recordFormData, oxygen_saturation: e.target.value})} 
+                    placeholder="98%" 
+                  />
                 </div>
+                <div className="form-group">
+                  <label>Frequenza Respiratoria</label>
+                  <input 
+                    type="text" 
+                    value={recordFormData.respiratory_rate} 
+                    onChange={(e) => setRecordFormData({...recordFormData, respiratory_rate: e.target.value})} 
+                    placeholder="16 atti/min" 
+                  />
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginTop: '1.5rem' }}>
+                <label>📎 Allega Documenti</label>
+                <input 
+                  type="file" 
+                  multiple
+                  accept=".txt,.pdf,.json,.jpg,.jpeg,.png"
+                  onChange={(e) => setRecordFiles(Array.from(e.target.files))}
+                  style={{
+                    padding: '0.5rem',
+                    border: '2px dashed #667eea',
+                    borderRadius: '0.5rem',
+                    background: '#f8f9ff',
+                    cursor: 'pointer',
+                    width: '100%'
+                  }}
+                />
+                <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                  Formati supportati: TXT, PDF, JSON, JPG, JPEG, PNG
+                </p>
+                {recordFiles.length > 0 && (
+                  <div style={{ marginTop: '0.5rem' }}>
+                    {recordFiles.map((file, idx) => (
+                      <div key={idx} style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '0.5rem',
+                        padding: '0.25rem 0',
+                        fontSize: '0.9rem',
+                        color: '#667eea'
+                      }}>
+                        <span>📄</span>
+                        <span>{file.name}</span>
+                        <span style={{ color: '#9ca3af' }}>({(file.size / 1024).toFixed(1)} KB)</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label>📝 Note del Medico</label>
+                <textarea 
+                  value={recordFormData.notes} 
+                  onChange={(e) => setRecordFormData({...recordFormData, notes: e.target.value})} 
+                  placeholder="Annotazioni, osservazioni o intuizioni del medico riguardo al caso..."
+                  rows="4"
+                  style={{ fontFamily: 'monospace', fontSize: '0.95rem' }}
+                ></textarea>
               </div>
 
               <div className="modal-buttons">
@@ -666,6 +859,18 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
             </form>
           </div>
         </div>
+      )}
+
+      {/* AI Diagnosis Modal */}
+      {showDiagnosisModal && foundPatient && (
+        <DiagnosisModal 
+          patient={foundPatient}
+          selectedRecord={selectedRecord !== null ? clinicalRecords[selectedRecord] : null}
+          onClose={() => {
+            setShowDiagnosisModal(false)
+            setSelectedRecord(null)
+          }}
+        />
       )}
     </>
   )

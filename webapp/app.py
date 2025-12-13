@@ -30,6 +30,14 @@ except ImportError:
     MONGODB_AVAILABLE = False
     MongoDBPatientRepository = None
 
+# AI Medical Diagnostics
+try:
+    from src.ai.medical_diagnostics import MedicalDiagnosticsAI
+    AI_AVAILABLE = True
+except ImportError:
+    AI_AVAILABLE = False
+    MedicalDiagnosticsAI = None
+
 app = Flask(__name__)
 app.secret_key = Config.FLASK_SECRET_KEY
 app.config['UPLOAD_FOLDER'] = Path(__file__).parent / 'uploads'
@@ -50,11 +58,12 @@ processor = None
 metrics_observer = None
 db = None
 db_connected = False
+ai_diagnostics = None
 
 
 def initialize_system():
     """Initialize the clinical gateway system."""
-    global gateway, processor, metrics_observer, db, db_connected
+    global gateway, processor, metrics_observer, db, db_connected, ai_diagnostics
     
     try:
         # Initialize MongoDB
@@ -73,6 +82,22 @@ def initialize_system():
                 print(f"❌ MongoDB connection failed: {e}")
                 print("⚠️  Check your .env file configuration")
                 db_connected = False
+        
+        # Initialize AI Diagnostics
+        if AI_AVAILABLE and hasattr(Config, 'GEMINI_API_KEY') and Config.GEMINI_API_KEY:
+            try:
+                openai_key = getattr(Config, 'OPENAI_API_KEY', None)
+                ai_diagnostics = MedicalDiagnosticsAI(
+                    api_key=Config.GEMINI_API_KEY,
+                    openai_api_key=openai_key
+                )
+                print("✅ AI Medical Diagnostics initialized successfully")
+                print(f"   Gemini: ✅ | OpenAI Fallback: {'✅' if openai_key else '❌'}")
+            except Exception as e:
+                print(f"⚠️  AI initialization failed: {e}")
+                ai_diagnostics = None
+        else:
+            print("⚠️  AI Diagnostics not available (missing API key or module)")
         
         # Initialize gateway components
         gateway = ClinicalGateway()
@@ -449,26 +474,59 @@ def get_patient_records(fiscal_code):
 @require_login
 def add_clinical_record(fiscal_code):
     """Add a clinical record to a patient."""
-    data = request.json
-    
     if not db_connected:
         return jsonify({'error': 'Database non connesso'}), 500
     
     try:
         # Get current doctor from session
         doctor_id = session.get('doctor_id')
-        doctor_data = db.find_doctor(doctor_id) if doctor_id else None
+        doctor_data = db.find_doctor_by_id(doctor_id) if doctor_id else None
         
-        # Create record
+        # Handle both JSON and FormData
+        if request.is_json:
+            data = request.json
+            attachments = []
+        else:
+            data = request.form
+            attachments = []
+            
+            # Handle file uploads
+            if 'files' in request.files:
+                files = request.files.getlist('files')
+                upload_folder = app.config['UPLOAD_FOLDER'] / fiscal_code / datetime.now().strftime('%Y%m%d_%H%M%S')
+                upload_folder.mkdir(parents=True, exist_ok=True)
+                
+                for file in files:
+                    if file and file.filename:
+                        filename = secure_filename(file.filename)
+                        filepath = upload_folder / filename
+                        file.save(filepath)
+                        attachments.append({
+                            'name': filename,
+                            'path': str(filepath),
+                            'size': filepath.stat().st_size,
+                            'type': file.content_type
+                        })
+        
+        # Parse vital_signs if it's a string
+        vital_signs = data.get('vital_signs', {})
+        if isinstance(vital_signs, str):
+            import json
+            vital_signs = json.loads(vital_signs)
+        
+        # Create record with new structure
         record = {
             'timestamp': datetime.now().isoformat(),
-            'tipo_scheda': data.get('tipo_scheda', 'Visita'),
-            'chief_complaint': data.get('chief_complaint'),
-            'symptoms': data.get('symptoms'),
-            'diagnosis': data.get('diagnosis'),
-            'treatment': data.get('treatment'),
-            'notes': data.get('notes'),
-            'vital_signs': data.get('vital_signs', {}),
+            'motivo_tipo': data.get('motivo_tipo', 'Visita'),
+            'motivo': data.get('motivo', ''),
+            'tipo_scheda': data.get('motivo_tipo', data.get('tipo_scheda', 'Visita')),  # Backward compatibility
+            'chief_complaint': data.get('motivo', data.get('chief_complaint', '')),  # Backward compatibility
+            'symptoms': data.get('symptoms', ''),
+            'diagnosis': data.get('diagnosis', ''),
+            'treatment': data.get('treatment', ''),
+            'notes': data.get('notes', ''),
+            'vital_signs': vital_signs,
+            'attachments': attachments,
             'lab_results': data.get('lab_results', []),
             'imaging': data.get('imaging', []),
             'doctor_id': doctor_id,
@@ -629,6 +687,173 @@ def debug_check_doctor(doctor_id):
             return jsonify({'found': False, 'error': f'Doctor {doctor_id} not found in database'}), 404
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# ========== AI MEDICAL DIAGNOSTICS ROUTES ==========
+
+@app.route('/api/diagnostics/generate', methods=['POST'])
+@require_login
+def generate_diagnosis():
+    """
+    Generate AI-powered medical diagnosis for a patient.
+    Requires doctor authentication.
+    """
+    if not db_connected:
+        return jsonify({'error': 'Database non connesso'}), 500
+    
+    if not ai_diagnostics:
+        return jsonify({'error': 'Servizio di diagnostica AI non disponibile'}), 503
+    
+    try:
+        data = request.json
+        fiscal_code = data.get('fiscal_code')
+        clinical_record = data.get('clinical_record')  # Scheda specifica se presente
+        
+        if not fiscal_code:
+            return jsonify({'error': 'Codice fiscale mancante'}), 400
+        
+        # Get patient object from database
+        patient = db.get_patient(fiscal_code)
+        
+        if not patient:
+            return jsonify({'error': 'Paziente non trovato'}), 404
+        
+        # Convert Patient object to dictionary for AI
+        patient_data = db._patient_to_dict(patient)
+        
+        # Add codice_fiscale if not present
+        if 'codice_fiscale' not in patient_data or not patient_data['codice_fiscale']:
+            patient_data['codice_fiscale'] = fiscal_code
+        
+        # Se è stata passata una scheda specifica, usa solo quella
+        if clinical_record:
+            # Analizza solo la scheda specifica
+            patient_data['motivo_tipo'] = clinical_record.get('motivo_tipo') or clinical_record.get('tipo_scheda')
+            patient_data['motivo'] = clinical_record.get('motivo') or clinical_record.get('chief_complaint')
+            patient_data['sintomi'] = clinical_record.get('symptoms', '')
+            patient_data['segni_vitali'] = clinical_record.get('vital_signs', {})
+            patient_data['note'] = clinical_record.get('notes', '')
+            patient_data['diagnosi_precedenti'] = clinical_record.get('diagnosis', '')
+            patient_data['trattamento'] = clinical_record.get('treatment', '')
+            patient_data['timestamp_visita'] = clinical_record.get('timestamp')
+            patient_data['dottore'] = clinical_record.get('doctor_name', '')
+            
+            # Aggiungi info su allegati se presenti
+            if clinical_record.get('attachments'):
+                patient_data['allegati'] = [att.get('name', att) for att in clinical_record['attachments']]
+        else:
+            # Altrimenti usa tutti i record clinici disponibili
+            try:
+                clinical_records = db.get_patient_clinical_records(fiscal_code)
+                if clinical_records:
+                    # Add the most recent clinical data
+                    latest_record = clinical_records[0] if len(clinical_records) > 0 else {}
+                    if latest_record:
+                        patient_data['ultima_visita'] = latest_record.get('timestamp')
+                        patient_data['sintomi'] = latest_record.get('symptoms', [])
+                        patient_data['segni_vitali'] = latest_record.get('vital_signs', {})
+                        patient_data['diagnosi_precedenti'] = latest_record.get('diagnosis', '')
+                        patient_data['trattamento'] = latest_record.get('treatment', '')
+                        patient_data['note'] = latest_record.get('notes', '')
+                        
+                    # Add count of records for context
+                    patient_data['numero_visite'] = len(clinical_records)
+            except Exception as e:
+                print(f"Warning: Could not load clinical records: {e}")
+        
+        # Check if doctor has access to this patient (if doctor_id field exists)
+        doctor_id = session.get('doctor_id')
+        # Note: Not all patients have doctor_id field, so we skip this check for now
+        
+        # Generate diagnosis using AI
+        print(f"Generating diagnosis for patient: {fiscal_code}")
+        diagnosis_result = ai_diagnostics.generate_diagnosis(patient_data)
+        print(f"Diagnosis result success: {diagnosis_result.get('success')}")
+        
+        if not diagnosis_result.get('success'):
+            error_msg = diagnosis_result.get('error', 'Unknown error')
+            print(f"Diagnosis generation failed: {error_msg}")
+            return jsonify({
+                'error': 'Errore nella generazione della diagnosi',
+                'details': error_msg
+            }), 500
+        
+        # Save diagnosis to database (optional: you could add a diagnoses collection)
+        diagnosis_record = {
+            'patient_id': fiscal_code,
+            'doctor_id': doctor_id,
+            'diagnosis': diagnosis_result['diagnosis'],
+            'timestamp': diagnosis_result['timestamp'],
+            'model': diagnosis_result['model'],
+            'metadata': diagnosis_result['metadata']
+        }
+        
+        # Optionally save to a diagnoses collection
+        try:
+            db.db['diagnoses'].insert_one(diagnosis_record)
+        except:
+            pass  # If collection doesn't exist, we'll just return the result
+        
+        return jsonify({
+            'success': True,
+            'diagnosis': diagnosis_result['diagnosis'],
+            'timestamp': diagnosis_result['timestamp'],
+            'patient_id': fiscal_code,
+            'metadata': diagnosis_result['metadata']
+        }), 200
+        
+    except Exception as e:
+        print(f"Error in generate_diagnosis: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/diagnostics/history/<fiscal_code>', methods=['GET'])
+@require_login
+def get_diagnosis_history(fiscal_code):
+    """
+    Get diagnosis history for a patient.
+    Requires doctor authentication.
+    """
+    if not db_connected:
+        return jsonify({'error': 'Database non connesso'}), 500
+    
+    try:
+        # Get patient object to verify it exists
+        patient = db.get_patient(fiscal_code)
+        
+        if not patient:
+            return jsonify({'error': 'Paziente non trovato'}), 404
+        
+        # Check if doctor has access to this patient (if needed)
+        # Note: Not enforcing doctor_id check for now as not all patients have this field
+        
+        # Get diagnosis history
+        diagnoses = list(db.db['diagnoses'].find(
+            {'patient_id': fiscal_code},
+            {'_id': 0}
+        ).sort('timestamp', -1).limit(10))
+        
+        return jsonify({
+            'success': True,
+            'patient_id': fiscal_code,
+            'diagnoses': diagnoses,
+            'count': len(diagnoses)
+        }), 200
+        
+    except Exception as e:
+        print(f"Error in get_diagnosis_history: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/diagnostics/status', methods=['GET'])
+def diagnostics_status():
+    """Check if AI diagnostics service is available."""
+    return jsonify({
+        'available': ai_diagnostics is not None,
+        'model': 'gemini-2.5-flash' if ai_diagnostics else None
+    }), 200
 
 
 if __name__ == '__main__':

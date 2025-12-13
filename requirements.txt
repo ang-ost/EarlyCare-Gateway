@@ -54,6 +54,12 @@ pymongo>=4.6.0  # MongoDB
 Flask>=3.0.0
 Werkzeug>=3.0.0
 
+# AI - Google Gemini for medical diagnostics
+google-generativeai>=0.3.0
+
+# AI - OpenAI (fallback)
+openai>=1.0.0
+
 # Optional: Message queues
 # celery>=5.3.0
 # redis>=4.6.0

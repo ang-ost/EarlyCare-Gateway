@@ -67,6 +67,12 @@ class Config:
     CACHE_TTL_SECONDS: int = int(os.getenv('CACHE_TTL_SECONDS', '300'))
     MAX_PROCESSING_TIME_MS: int = int(os.getenv('MAX_PROCESSING_TIME_MS', '30000'))
     
+    # ============================================
+    # AI Configuration
+    # ============================================
+    GEMINI_API_KEY: Optional[str] = os.getenv('GEMINI_API_KEY')
+    OPENAI_API_KEY: Optional[str] = os.getenv('OPENAI_API_KEY')
+    
     @classmethod
     def get_mongodb_connection_params(cls) -> dict:
         """
