@@ -1,0 +1,81 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Logs
+*.log
+logs/
+
+# Uploads (preserva solo la struttura)
+webapp/uploads/*
+!webapp/uploads/.gitkeep
+
+# Node modules (per frontend)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Build outputs
+frontend/dist/
+frontend/build/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Documentation
+docs/_build/
+
+# Git
+.git/
+.gitignore
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+
+# Scripts locali
+start_webapp.ps1
+setup_local_mongodb.ps1
+
+# OneDrive
+OneDrive/
