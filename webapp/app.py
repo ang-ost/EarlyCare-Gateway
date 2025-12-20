@@ -61,11 +61,12 @@ metrics_observer = None
 db = None
 db_connected = False
 ai_diagnostics = None
+chatbot_ai = None
 
 
 def initialize_system():
     """Initialize the clinical gateway system."""
-    global gateway, processor, metrics_observer, db, db_connected, ai_diagnostics
+    global gateway, processor, metrics_observer, db, db_connected, ai_diagnostics, chatbot_ai
     
     try:
         # Initialize MongoDB
@@ -88,18 +89,24 @@ def initialize_system():
         # Initialize AI Diagnostics
         if AI_AVAILABLE and hasattr(Config, 'GEMINI_API_KEY') and Config.GEMINI_API_KEY:
             try:
-                openai_key = getattr(Config, 'OPENAI_API_KEY', None)
-                ai_diagnostics = MedicalDiagnosticsAI(
-                    api_key=Config.GEMINI_API_KEY,
-                    openai_api_key=openai_key
-                )
+                ai_diagnostics = MedicalDiagnosticsAI(api_key=Config.GEMINI_API_KEY)
                 print("✅ AI Medical Diagnostics initialized successfully")
-                print(f"   Gemini: ✅ | OpenAI Fallback: {'✅' if openai_key else '❌'}")
             except Exception as e:
-                print(f"⚠️  AI initialization failed: {e}")
+                print(f"⚠️  AI Diagnostics initialization failed: {e}")
                 ai_diagnostics = None
         else:
             print("⚠️  AI Diagnostics not available (missing API key or module)")
+        
+        # Initialize Chatbot AI (con chiave separata)
+        if AI_AVAILABLE and hasattr(Config, 'CHATBOT_GEMINI_API_KEY') and Config.CHATBOT_GEMINI_API_KEY:
+            try:
+                chatbot_ai = MedicalDiagnosticsAI(api_key=Config.CHATBOT_GEMINI_API_KEY)
+                print("✅ Chatbot AI initialized successfully (separate API key)")
+            except Exception as e:
+                print(f"⚠️  Chatbot AI initialization failed: {e}")
+                chatbot_ai = None
+        else:
+            print("⚠️  Chatbot AI not available (missing CHATBOT_GEMINI_API_KEY)")
         
         # Initialize gateway components
         gateway = ClinicalGateway()
@@ -900,6 +907,86 @@ def diagnostics_status():
         'available': ai_diagnostics is not None,
         'model': 'gemini-2.5-flash' if ai_diagnostics else None
     }), 200
+
+
+# ========== MEDICAL CHATBOT ROUTES ==========
+
+@app.route('/api/chatbot/ask', methods=['POST'])
+def chatbot_ask():
+    """
+    Medical chatbot endpoint - answers only medical questions.
+    Uses strict prompt to prevent misuse.
+    Uses separate API key (CHATBOT_GEMINI_API_KEY).
+    """
+    if not chatbot_ai:
+        return jsonify({
+            'success': False,
+            'response': 'Mi dispiace, il servizio di assistenza medica non è al momento disponibile.'
+        }), 503
+    
+    try:
+        data = request.json
+        question = data.get('question', '').strip()
+        
+        if not question:
+            return jsonify({
+                'success': False,
+                'response': 'Per favore, scrivi una domanda.'
+            }), 400
+        
+        # Create strict medical chatbot prompt
+        chatbot_prompt = f"""Sei un assistente medico virtuale professionale e rigoroso.
+
+REGOLE RIGIDE:
+1. Rispondi SOLO a domande di carattere medico, sanitario o relativo alla salute
+2. Se la domanda NON è medica, rispondi esattamente: "Mi dispiace, posso rispondere solo a domande di carattere medico e sanitario. Come posso aiutarti con questioni relative alla salute?"
+3. Non rispondere a domande su: tempo, sport, cucina, politica, intrattenimento, tecnologia (non medica), o qualsiasi argomento non medico
+4. Fornisci risposte complete, chiare e professionali
+5. Usa linguaggio italiano professionale ma comprensibile
+6. Alla fine del messaggio inserisci sempre: 'Posso commettere errori: per informazioni mediche è sempre meglio chiedere a un medico o a un professionista qualificato.'
+
+7. Non fare diagnosi, suggerisci sempre di consultare un medico per diagnosi precise
+8. IMPORTANTE: Scrivi SOLO testo semplice senza formattazione. NON usare: *, #, -, o altri simboli markdown. Usa solo testo normale con a capo per separare i paragrafi.
+
+Domanda dell'utente: {question}
+
+Fornisci una risposta appropriata seguendo rigorosamente le regole sopra."""
+
+        # Generate response using Chatbot AI (con chiave API separata)
+        response = chatbot_ai.model.generate_content(
+            chatbot_prompt,
+            generation_config={
+                'temperature': 0.3,
+                'top_p': 0.9,
+                'top_k': 40,
+                'max_output_tokens': 2048,
+            }
+        )
+        
+        if not response or not hasattr(response, 'text'):
+            return jsonify({
+                'success': False,
+                'response': 'Mi dispiace, si è verificato un errore. Riprova.'
+            }), 500
+        
+        answer = response.text.strip()
+        
+        # Log chatbot interaction (optional)
+        print(f"[CHATBOT] Q: {question[:50]}... | A: {answer[:50]}...")
+        
+        return jsonify({
+            'success': True,
+            'response': answer
+        }), 200
+        
+    except Exception as e:
+        print(f"Error in chatbot_ask: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'response': 'Mi dispiace, si è verificato un errore tecnico. Riprova più tardi.'
+        }), 500
 
 
 if __name__ == '__main__':

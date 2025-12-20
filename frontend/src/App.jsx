@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Profile from './pages/Profile'
+import MedicalChatbot from './components/MedicalChatbot'
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState('login')
@@ -54,6 +55,9 @@ export default function App() {
       {currentPage === 'login' && <Login onLogin={handleLogin} />}
       {currentPage === 'dashboard' && <Dashboard user={user} onNavigate={setCurrentPage} onLogout={handleLogout} />}
       {currentPage === 'profile' && <Profile user={user} onNavigate={setCurrentPage} onLogout={handleLogout} />}
+      
+      {/* Medical Chatbot - disponibile sempre */}
+      <MedicalChatbot />
     </>
   )
 }

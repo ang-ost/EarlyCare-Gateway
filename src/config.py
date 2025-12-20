@@ -73,6 +73,9 @@ class Config:
     GEMINI_API_KEY: Optional[str] = os.getenv('GEMINI_API_KEY')
     OPENAI_API_KEY: Optional[str] = os.getenv('OPENAI_API_KEY')
     
+    # Chatbot AI Configuration (usa una chiave separata)
+    CHATBOT_GEMINI_API_KEY: Optional[str] = os.getenv('CHATBOT_GEMINI_API_KEY')
+    
     @classmethod
     def get_mongodb_connection_params(cls) -> dict:
         """
