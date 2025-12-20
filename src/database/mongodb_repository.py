@@ -512,6 +512,7 @@ class MongoDBPatientRepository:
                     'treatment': r.get('metadata', {}).get('treatment'),
                     'notes': r.get('metadata', {}).get('notes'),
                     'vital_signs': r.get('metadata', {}).get('vital_signs', {}),
+                    'attachments': r.get('metadata', {}).get('attachments', []),
                     'priority': r.get('priority')
                 }
                 for r in records
@@ -559,6 +560,7 @@ class MongoDBPatientRepository:
                     'treatment': record.get('treatment'),
                     'notes': record.get('notes'),
                     'vital_signs': record.get('vital_signs', {}),
+                    'attachments': record.get('attachments', []),
                     'lab_results': record.get('lab_results', []),
                     'imaging': record.get('imaging', []),
                     'original_encounter_id': record.get('original_encounter_id')

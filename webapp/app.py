@@ -630,45 +630,26 @@ def add_clinical_record(fiscal_code):
             data = request.form
             attachments = []
             
-            # Handle file uploads
+            # Handle file uploads - save as base64 in database
             if 'files' in request.files:
                 files = request.files.getlist('files')
-                upload_folder = app.config['UPLOAD_FOLDER'] / fiscal_code / datetime.now().strftime('%Y%m%d_%H%M%S')
-                upload_folder.mkdir(parents=True, exist_ok=True)
                 
-                pdf_records_imported = 0
                 for file in files:
                     if file and file.filename:
                         filename = secure_filename(file.filename)
-                        filepath = upload_folder / filename
-                        file.save(filepath)
+                        file_content = file.read()
                         
-                        # Check if it's a PDF and try to extract clinical records
-                        if filename.lower().endswith('.pdf'):
-                            extracted_records = extract_clinical_records_from_pdf(str(filepath))
-                            if extracted_records:
-                                # Import each record as a separate clinical record
-                                for record in extracted_records:
-                                    record['doctor_id'] = doctor_id
-                                    record['doctor_name'] = f"{doctor_data.get('nome', '')} {doctor_data.get('cognome', '')}" if doctor_data else 'Importato da PDF'
-                                    record['doctor_specialization'] = doctor_data.get('specializzazione', '') if doctor_data else ''
-                                    db.add_clinical_record(fiscal_code, record)
-                                    pdf_records_imported += 1
-                                
-                                # If we imported records from PDF, skip creating a new record from form
-                                if pdf_records_imported > 0:
-                                    return jsonify({
-                                        'success': True, 
-                                        'message': f'{pdf_records_imported} schede cliniche importate dal PDF con successo',
-                                        'imported_count': pdf_records_imported
-                                    })
+                        # Encode file content as base64
+                        import base64
+                        file_base64 = base64.b64encode(file_content).decode('utf-8')
                         
-                        # If not a clinical record PDF, treat as normal attachment
+                        # Save attachment with base64 content
                         attachments.append({
                             'name': filename,
-                            'path': str(filepath),
-                            'size': filepath.stat().st_size,
-                            'type': file.content_type
+                            'content': file_base64,
+                            'size': len(file_content),
+                            'type': file.content_type or 'application/octet-stream',
+                            'uploaded_at': datetime.now().isoformat()
                         })
         
         # Parse vital_signs if it's a string
@@ -770,7 +751,11 @@ def upload_folder():
                             rr_match = re.search(r'Frequenza Respiratoria:\s*(.+?)(?:\n|Note|Scheda)', record_text)
                             
                             # Extract notes
-                            notes_match = re.search(r'Note:\s*(.+?)(?:Scheda Clinica #|Documento generato|\Z)', record_text, re.DOTALL)
+                            notes_match = re.search(r'Note:\s*(.+?)(?:Allegati:|ATTACHMENT_DATA_START|Scheda Clinica #|Documento generato|\Z)', record_text, re.DOTALL)
+                            
+                            # Extract attachments from JSON metadata section
+                            attachments = []
+                            print(f"DEBUG: Looking for attachments in record #{i+1}")
                             
                             # Parse timestamp
                             timestamp_str = match.group(2)
@@ -798,11 +783,41 @@ def upload_folder():
                                     'oxygen_saturation': o2_match.group(1).strip() if o2_match else '',
                                     'respiratory_rate': rr_match.group(1).strip() if rr_match else ''
                                 },
-                                'attachments': [],
+                                'attachments': attachments,
                                 'original_encounter_id': encounter_id_match.group(1).strip() if encounter_id_match else 'N/A'
                             }
                             
                             records.append(record)
+                        
+                        # Extract attachments from PDF metadata
+                        attachments_data = {}
+                        try:
+                            # Check if PDF has custom metadata with attachments
+                            if hasattr(reader, 'metadata') and reader.metadata:
+                                metadata_key = '/EarlyCareAttachments'
+                                if metadata_key in reader.metadata:
+                                    print("DEBUG: Found attachments in PDF metadata")
+                                    import json
+                                    import base64
+                                    b64_data = reader.metadata[metadata_key]
+                                    json_str = base64.b64decode(b64_data).decode('utf-8')
+                                    attachments_data = json.loads(json_str)
+                                    print(f"DEBUG: Parsed attachments data for {len(attachments_data)} records")
+                                else:
+                                    print("DEBUG: No EarlyCareAttachments metadata found")
+                            else:
+                                print("DEBUG: PDF has no metadata")
+                        except Exception as e:
+                            print(f"DEBUG: Error reading PDF metadata: {e}")
+                            import traceback
+                            traceback.print_exc()
+                        
+                        # Assign attachments to records
+                        for idx, record in enumerate(records):
+                            record_key = f"record_{idx + 1}"
+                            if record_key in attachments_data:
+                                record['attachments'] = attachments_data[record_key]
+                                print(f"DEBUG: Assigned {len(attachments_data[record_key])} attachments to record #{idx+1}")
                         
                         if records:
                             print(f"✅ Found {len(records)} clinical records in PDF")
@@ -1081,6 +1096,19 @@ def export_patient_data(fiscal_code):
                         notes_text = ', '.join(str(n) for n in notes_text)
                     story.append(Paragraph(str(notes_text), styles['Normal']))
                 
+                # Add attachments list if available
+                attachments = record.get('attachments', [])
+                if attachments:
+                    story.append(Spacer(1, 0.3*cm))
+                    story.append(Paragraph('<b>Allegati:</b>', styles['Normal']))
+                    for att in attachments:
+                        att_name = att.get('name', 'N/A')
+                        att_size = att.get('size', 0)
+                        att_type = att.get('type', 'N/A')
+                        size_kb = round(att_size / 1024, 2) if att_size else 0
+                        att_text = f"📎 {att_name} ({size_kb} KB, {att_type})"
+                        story.append(Paragraph(att_text, styles['Normal']))
+                
                 story.append(Spacer(1, 0.5*cm))
         else:
             story.append(Paragraph("Nessuna scheda clinica disponibile", styles['Normal']))
@@ -1103,8 +1131,42 @@ def export_patient_data(fiscal_code):
         # Build PDF
         doc.build(story)
         
-        # Seek to beginning of file
-        memory_file.seek(0)
+        # Add attachments as PDF metadata
+        if any(record.get('attachments') for record in clinical_records):
+            import json
+            import base64
+            from PyPDF2 import PdfReader, PdfWriter
+            
+            # Read the generated PDF
+            memory_file.seek(0)
+            reader = PdfReader(memory_file)
+            writer = PdfWriter()
+            
+            # Copy all pages
+            for page in reader.pages:
+                writer.add_page(page)
+            
+            # Prepare attachments data
+            attachments_data = {}
+            for idx, record in enumerate(clinical_records, 1):
+                if record.get('attachments'):
+                    attachments_data[f"record_{idx}"] = record['attachments']
+            
+            # Add as custom metadata
+            if attachments_data:
+                json_data = json.dumps(attachments_data, ensure_ascii=False)
+                writer.add_metadata({
+                    '/EarlyCareAttachments': base64.b64encode(json_data.encode('utf-8')).decode('ascii')
+                })
+            
+            # Write to new memory file
+            output_file = io.BytesIO()
+            writer.write(output_file)
+            output_file.seek(0)
+            memory_file = output_file
+        else:
+            # Seek to beginning of file
+            memory_file.seek(0)
         
         # Generate filename
         filename = f"cartella_clinica_{fiscal_code}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
