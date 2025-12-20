@@ -544,7 +544,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                   id="fileUploadInput"
                   type="file" 
                   multiple
-                  accept=".txt,.pdf,.json,.jpg,.jpeg,.png,.dcm"
+                  accept=".pdf,application/pdf"
                   onChange={(e) => {
                     const files = Array.from(e.target.files)
                     setUploadedFiles(prev => [...prev, ...files])
@@ -552,15 +552,15 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                   }}
                   style={{ display: 'none' }}
                 />
-                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>{isDragging ? '📥' : '☁️'}</div>
+                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>{isDragging ? '📥' : '📄'}</div>
                 <p style={{ margin: '0.5rem 0' }}>
-                  {isDragging ? 'Rilascia i file qui' : 'Trascina file qui o clicca per selezionare'}
+                  {isDragging ? 'Rilascia i file PDF qui' : 'Trascina file PDF qui o clicca per selezionare'}
                 </p>
                 <button type="button" className="btn btn-secondary" style={{ marginTop: '0.5rem', pointerEvents: 'none' }}>
-                  📁 Seleziona File
+                  📁 Seleziona PDF
                 </button>
                 <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '0.75rem' }}>
-                  Formati supportati: TXT, PDF, JSON, JPG, JPEG, PNG, DICOM
+                  Solo file PDF esportati dalla piattaforma
                 </p>
               </div>
               
