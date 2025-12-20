@@ -435,10 +435,6 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
             <h1 style={{ margin: 0, fontSize: '1.5rem' }}>Medical Access & Vision</h1>
           </div>
           <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', color: '#1e3a8a', fontWeight: '500' }}>
-              <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', background: '#059669' }}></span>
-              Database Connesso
-            </div>
             <div className="user-menu">
               <button className="menu-button" onClick={() => setShowMenu(!showMenu)}>
                 💼 {user?.firstName} {user?.lastName}
@@ -498,7 +494,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
           e.currentTarget.style.background = 'none'
           e.currentTarget.style.transform = 'translateY(0)'
         }}>
-          📤 Esporta
+          Esporta
         </button>
         <button onClick={() => setShowPatientSearch(true)} style={{
           flex: 1,
@@ -522,7 +518,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
           e.currentTarget.style.background = 'none'
           e.currentTarget.style.transform = 'translateY(0)'
         }}>
-          🔎 Ricerca Paziente
+          Ricerca Paziente
         </button>
         <button onClick={() => setShowPatientForm(true)} style={{
           flex: 1,
@@ -546,7 +542,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
           e.currentTarget.style.background = 'none'
           e.currentTarget.style.transform = 'translateY(0)'
         }}>
-          🆕 Nuovo Paziente
+        Nuovo Paziente
         </button>
         <button onClick={() => {
           if (foundPatient) {
@@ -579,7 +575,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
           e.currentTarget.style.background = 'none'
           e.currentTarget.style.transform = 'translateY(0)'
         }}>
-          📄 Nuova Scheda
+        Nuova Scheda
         </button>
       </nav>
 
@@ -1073,7 +1069,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
       {showPatientSearch && (
         <div className="modal-overlay" onClick={() => setShowPatientSearch(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>🔎 Ricerca Paziente</h3>
+            <h3>Ricerca Paziente</h3>
             {error && <div className="alert alert-danger">{error}</div>}
             <form onSubmit={handlePatientSearch}>
               <div className="form-group">
@@ -1103,7 +1099,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
       {showPatientForm && (
         <div className="modal-overlay" onClick={() => setShowPatientForm(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h3>🆕 Nuovo Paziente</h3>
+            <h3>Nuovo Paziente</h3>
             {error && <div className="alert alert-danger">{error}</div>}
             
             <form onSubmit={handleCreatePatient}>

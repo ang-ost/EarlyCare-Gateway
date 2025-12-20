@@ -179,14 +179,6 @@ Generato da EarlyCare Gateway - ${new Date().toISOString()}
               marginBottom: '1.5rem'
             }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-                <div>
-                  <strong>🤖 Modello AI:</strong>{' '}
-                  <span>{diagnosis.metadata?.model || 'gemini-2.5-flash'}</span>
-                </div>
-                <div>
-                  <strong>📊 Punti dati analizzati:</strong>{' '}
-                  <span>{diagnosis.metadata?.data_points_analyzed || 'N/A'}</span>
-                </div>
                 {diagnosis.metadata?.finish_reason && diagnosis.metadata.finish_reason !== 'COMPLETE' && (
                   <div style={{ gridColumn: '1 / -1', color: '#6b7280' }}>
                     <strong>Status:</strong> {diagnosis.metadata.finish_reason}
