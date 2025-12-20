@@ -425,7 +425,14 @@ class MongoDBPatientRepository:
         try:
             patient = self.get_patient(codice_fiscale)
             if patient:
-                # Convert Patient object to dictionary
+                # Calculate age if birth date is available
+                age = None
+                if patient.data_nascita:
+                    from datetime import datetime
+                    today = datetime.now()
+                    age = today.year - patient.data_nascita.year - ((today.month, today.day) < (patient.data_nascita.month, patient.data_nascita.day))
+                
+                # Convert Patient object to dictionary with all fields
                 patient_dict = {
                     'patient_id': patient.patient_id,
                     'nome': patient.nome,
@@ -433,10 +440,15 @@ class MongoDBPatientRepository:
                     'codice_fiscale': patient.codice_fiscale,
                     'data_nascita': patient.data_nascita.strftime('%Y-%m-%d') if patient.data_nascita else None,
                     'sesso': patient.gender.value if patient.gender else None,
+                    'gender': patient.gender.value if patient.gender else None,  # Alias for frontend
                     'luogo_nascita': patient.comune_nascita,
+                    'comune_nascita': patient.comune_nascita,  # Alias for frontend
+                    'age': age,
                     'indirizzo': getattr(patient, 'indirizzo', None),
                     'telefono': getattr(patient, 'telefono', None),
                     'email': getattr(patient, 'email', None),
+                    'allergie': getattr(patient, 'allergie', []),
+                    'malattie_permanenti': getattr(patient, 'malattie_permanenti', []),
                     'cartelle_cliniche': self.get_patient_clinical_records(codice_fiscale)
                 }
                 return patient_dict

@@ -12,6 +12,12 @@ import sys
 from functools import wraps
 import zipfile
 import io
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import cm
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -88,13 +94,11 @@ def initialize_system():
         # Initialize AI Diagnostics
         if AI_AVAILABLE and hasattr(Config, 'GEMINI_API_KEY') and Config.GEMINI_API_KEY:
             try:
-                openai_key = getattr(Config, 'OPENAI_API_KEY', None)
                 ai_diagnostics = MedicalDiagnosticsAI(
-                    api_key=Config.GEMINI_API_KEY,
-                    openai_api_key=openai_key
+                    api_key=Config.GEMINI_API_KEY
                 )
                 print("✅ AI Medical Diagnostics initialized successfully")
-                print(f"   Gemini: ✅ | OpenAI Fallback: {'✅' if openai_key else '❌'}")
+                print(f"   Gemini: ✅")
             except Exception as e:
                 print(f"⚠️  AI initialization failed: {e}")
                 ai_diagnostics = None
@@ -744,7 +748,7 @@ def get_metrics():
 @app.route('/api/export/<fiscal_code>', methods=['GET'])
 @require_login
 def export_patient_data(fiscal_code):
-    """Export patient data and clinical records as ZIP file."""
+    """Export patient data and clinical records as PDF file."""
     if not db_connected:
         return jsonify({'error': 'Database non connesso'}), 500
     
@@ -754,52 +758,213 @@ def export_patient_data(fiscal_code):
         if not patient_data:
             return jsonify({'error': 'Paziente non trovato'}), 404
         
+        print(f"DEBUG: Patient data keys: {list(patient_data.keys())}")
+        print(f"DEBUG: Comune Nascita (luogo_nascita): '{patient_data.get('luogo_nascita')}'")
+        print(f"DEBUG: Gender (sesso): '{patient_data.get('sesso')}'")
+        print(f"DEBUG: Age: '{patient_data.get('age')}'")
+        print(f"DEBUG: Data nascita: '{patient_data.get('data_nascita')}'")
+        
         # Get clinical records
         clinical_records = []
         try:
-            clinical_records = list(db.get_clinical_records(fiscal_code))
+            clinical_records = db.get_patient_clinical_records(fiscal_code)
+            print(f"DEBUG: Found {len(clinical_records)} clinical records")
+            if clinical_records:
+                print(f"DEBUG: First record keys: {list(clinical_records[0].keys())}")
         except Exception as e:
             print(f"Warning: Could not load clinical records: {e}")
         
-        # Create ZIP file in memory
+        # Create PDF file in memory
         memory_file = io.BytesIO()
-        with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
-            # Add patient info
-            patient_json = json.dumps(patient_data, ensure_ascii=False, indent=2, default=str)
-            zf.writestr('patient_info.json', patient_json)
+        doc = SimpleDocTemplate(memory_file, pagesize=A4, 
+                               leftMargin=2*cm, rightMargin=2*cm,
+                               topMargin=2*cm, bottomMargin=2*cm)
+        
+        # Build content
+        story = []
+        styles = getSampleStyleSheet()
+        
+        # Custom styles
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            textColor=colors.HexColor('#2563eb'),
+            spaceAfter=30,
+            alignment=TA_CENTER
+        )
+        
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=16,
+            textColor=colors.HexColor('#1e40af'),
+            spaceAfter=12,
+            spaceBefore=12
+        )
+        
+        # Title
+        story.append(Paragraph("Cartella Clinica Elettronica", title_style))
+        story.append(Spacer(1, 0.5*cm))
+        
+        # Patient Information Section
+        story.append(Paragraph("Informazioni Paziente", heading_style))
+        
+        # Formatta la data di nascita
+        data_nascita = patient_data.get('data_nascita', 'N/A')
+        if isinstance(data_nascita, datetime):
+            data_nascita = data_nascita.strftime('%d/%m/%Y')
+        elif isinstance(data_nascita, str) and data_nascita != 'N/A':
+            # Se è una stringa in formato YYYY-MM-DD, convertila
+            try:
+                from datetime import datetime as dt
+                data_obj = dt.strptime(data_nascita, '%Y-%m-%d')
+                data_nascita = data_obj.strftime('%d/%m/%Y')
+                # Calcola l'età se non è disponibile
+                if not patient_data.get('age'):
+                    today = datetime.now()
+                    age = today.year - data_obj.year - ((today.month, today.day) < (data_obj.month, data_obj.day))
+                    patient_data['age'] = age
+            except:
+                pass
+        
+        # Gestisci i campi che potrebbero essere None - usa le chiavi corrette restituite da find_by_fiscal_code
+        comune_nascita = patient_data.get('luogo_nascita') or patient_data.get('comune_nascita') or 'N/A'
+        gender = patient_data.get('sesso') or patient_data.get('gender') or 'N/A'
+        age = patient_data.get('age')
+        age_str = str(age) if age is not None else 'N/A'
+        
+        patient_info = [
+            ['Nome:', patient_data.get('nome', 'N/A')],
+            ['Cognome:', patient_data.get('cognome', 'N/A')],
+            ['Codice Fiscale:', fiscal_code],
+            ['Data di Nascita:', str(data_nascita)],
+            ['Comune di Nascita:', comune_nascita],
+            ['Genere:', gender],
+            ['Età:', age_str],
+        ]
+        
+        patient_table = Table(patient_info, colWidths=[5*cm, 12*cm])
+        patient_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#e0e7ff')),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ]))
+        
+        story.append(patient_table)
+        story.append(Spacer(1, 1*cm))
+        
+        # Clinical Records Section
+        if clinical_records:
+            story.append(Paragraph(f"Schede Cliniche ({len(clinical_records)})", heading_style))
+            story.append(Spacer(1, 0.3*cm))
             
-            # Add clinical records
-            if clinical_records:
-                records_json = json.dumps(clinical_records, ensure_ascii=False, indent=2, default=str)
-                zf.writestr('clinical_records.json', records_json)
+            for idx, record in enumerate(clinical_records, 1):
+                # Record header
+                timestamp = record.get('timestamp', 'N/A')
+                if isinstance(timestamp, datetime):
+                    timestamp = timestamp.strftime('%d/%m/%Y %H:%M:%S')
+                elif isinstance(timestamp, str):
+                    try:
+                        ts = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                        timestamp = ts.strftime('%d/%m/%Y %H:%M:%S')
+                    except:
+                        pass
                 
-                # Create individual record files
-                for idx, record in enumerate(clinical_records):
-                    record_filename = f"record_{idx+1}_{record.get('timestamp', 'unknown')}.json"
-                    record_json = json.dumps(record, ensure_ascii=False, indent=2, default=str)
-                    zf.writestr(f"records/{record_filename}", record_json)
-            
-            # Add README
-            readme_content = f"""Cartella Clinica - {patient_data.get('first_name', '')} {patient_data.get('last_name', '')}
-Codice Fiscale: {fiscal_code}
-Data Export: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
-
-Contenuto:
-- patient_info.json: Informazioni anagrafiche del paziente
-- clinical_records.json: Tutte le schede cliniche
-- records/: Schede cliniche individuali
-"""
-            zf.writestr('README.txt', readme_content)
+                record_title = f"Scheda Clinica #{idx} - {timestamp}"
+                story.append(Paragraph(record_title, styles['Heading3']))
+                
+                # Record details
+                record_data = [
+                    ['ID Incontro:', str(record.get('encounter_id', 'N/A'))],
+                    ['Motivo Principale:', record.get('chief_complaint', 'N/A')],
+                    ['Sintomi:', record.get('symptoms', 'N/A')],
+                    ['Priorità:', record.get('priority', 'N/A')],
+                ]
+                
+                # Add vital signs if available
+                vital_signs = record.get('vital_signs', {})
+                if vital_signs:
+                    if vital_signs.get('blood_pressure'):
+                        record_data.append(['Pressione Sanguigna:', vital_signs['blood_pressure']])
+                    if vital_signs.get('heart_rate'):
+                        record_data.append(['Frequenza Cardiaca:', vital_signs['heart_rate']])
+                    if vital_signs.get('temperature'):
+                        record_data.append(['Temperatura:', vital_signs['temperature'] + '°C'])
+                    if vital_signs.get('oxygen_saturation'):
+                        record_data.append(['Saturazione O2:', vital_signs['oxygen_saturation']])
+                    if vital_signs.get('respiratory_rate'):
+                        record_data.append(['Frequenza Respiratoria:', vital_signs['respiratory_rate']])
+                
+                record_table = Table(record_data, colWidths=[5*cm, 12*cm])
+                record_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f3f4f6')),
+                    ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                    ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+                    ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+                    ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                    ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 8),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+                    ('TOPPADDING', (0, 0), (-1, -1), 6),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ]))
+                
+                story.append(record_table)
+                
+                # Add notes if available
+                if 'notes' in record and record['notes']:
+                    story.append(Spacer(1, 0.3*cm))
+                    story.append(Paragraph('<b>Note:</b>', styles['Normal']))
+                    notes_text = record['notes']
+                    if isinstance(notes_text, list):
+                        notes_text = ', '.join(str(n) for n in notes_text)
+                    story.append(Paragraph(str(notes_text), styles['Normal']))
+                
+                story.append(Spacer(1, 0.5*cm))
+        else:
+            story.append(Paragraph("Nessuna scheda clinica disponibile", styles['Normal']))
+        
+        # Footer
+        story.append(Spacer(1, 1*cm))
+        footer_style = ParagraphStyle(
+            'Footer',
+            parent=styles['Normal'],
+            fontSize=8,
+            textColor=colors.grey,
+            alignment=TA_CENTER
+        )
+        story.append(Paragraph(
+            f"Documento generato il {datetime.now().strftime('%d/%m/%Y alle %H:%M:%S')}",
+            footer_style
+        ))
+        story.append(Paragraph("EarlyCare Gateway - Sistema di Gestione Cartelle Cliniche", footer_style))
+        
+        # Build PDF
+        doc.build(story)
         
         # Seek to beginning of file
         memory_file.seek(0)
         
         # Generate filename
-        filename = f"cartella_clinica_{fiscal_code}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+        filename = f"cartella_clinica_{fiscal_code}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         
         return send_file(
             memory_file,
-            mimetype='application/zip',
+            mimetype='application/pdf',
             as_attachment=True,
             download_name=filename
         )

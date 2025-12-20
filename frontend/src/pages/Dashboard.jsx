@@ -75,7 +75,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `cartella_clinica_${fiscalCode}_${new Date().toISOString().slice(0,10)}.zip`
+      a.download = `cartella_clinica_${fiscalCode}_${new Date().toISOString().slice(0,10)}.pdf`
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(url)
@@ -485,13 +485,17 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                   <p><strong>{foundPatient.nome} {foundPatient.cognome}</strong></p>
                   <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: '0.25rem 0' }}>CF: {foundPatient.codice_fiscale}</p>
                   <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: '0.25rem 0' }}>Nato: {new Date(foundPatient.data_nascita).toLocaleDateString('it-IT')}</p>
-                  {foundPatient.allergie && foundPatient.allergie.length > 0 && (
-                    <p style={{ color: '#ef4444', fontSize: '0.85rem', marginTop: '0.5rem' }}>
-                      ⚠️ Allergie: {foundPatient.allergie.join(', ')}
-                    </p>
+                  {foundPatient.comune_nascita && (
+                    <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: '0.25rem 0' }}>Comune: {foundPatient.comune_nascita}</p>
+                  )}
+                  {foundPatient.gender && (
+                    <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: '0.25rem 0' }}>Genere: {foundPatient.gender}</p>
+                  )}
+                  {foundPatient.age && (
+                    <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: '0.25rem 0' }}>Età: {foundPatient.age} anni</p>
                   )}
                   {foundPatient.malattie_permanenti && foundPatient.malattie_permanenti.length > 0 && (
-                    <p style={{ color: '#ef4444', fontSize: '0.85rem' }}>
+                    <p style={{ color: '#ef4444', fontSize: '0.85rem', marginTop: '0.5rem' }}>
                       ⚠️ Malattie: {foundPatient.malattie_permanenti.join(', ')}
                     </p>
                   )}
