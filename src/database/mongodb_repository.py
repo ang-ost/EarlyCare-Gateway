@@ -538,8 +538,12 @@ class MongoDBPatientRepository:
                 return False
             
             # Create patient record document
+            # Use encounter_id from record if present, otherwise generate a unique one with microseconds
+            now = datetime.now()
+            encounter_id = record.get('encounter_id') or f"ENC-{now.strftime('%Y%m%d%H%M%S')}-{now.microsecond}"
+            
             record_doc = {
-                'encounter_id': f"ENC-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                'encounter_id': encounter_id,
                 'patient': {
                     'patient_id': patient.patient_id,
                     'nome': patient.nome,
@@ -548,7 +552,7 @@ class MongoDBPatientRepository:
                 },
                 'chief_complaint': record.get('chief_complaint'),
                 'encounter_timestamp': datetime.now(),
-                'priority': 'routine',
+                'priority': record.get('priority', 'routine'),
                 'metadata': {
                     'symptoms': record.get('symptoms'),
                     'diagnosis': record.get('diagnosis'),
@@ -556,7 +560,8 @@ class MongoDBPatientRepository:
                     'notes': record.get('notes'),
                     'vital_signs': record.get('vital_signs', {}),
                     'lab_results': record.get('lab_results', []),
-                    'imaging': record.get('imaging', [])
+                    'imaging': record.get('imaging', []),
+                    'original_encounter_id': record.get('original_encounter_id')
                 },
                 'created_at': datetime.now()
             }

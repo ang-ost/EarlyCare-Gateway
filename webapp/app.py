@@ -18,6 +18,8 @@ from reportlab.lib.units import cm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
+import PyPDF2
+import re
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -146,6 +148,105 @@ def require_login(f):
         return f(*args, **kwargs)
     return decorated_function
 
+
+# ========== PDF PARSING UTILITIES ==========
+def extract_clinical_records_from_pdf(pdf_path):
+    """
+    Extracts clinical records from an exported PDF.
+    Returns a list of clinical records if the PDF is an exported clinical record,
+    otherwise returns None.
+    """
+    try:
+        with open(pdf_path, 'rb') as file:
+            pdf_reader = PyPDF2.PdfReader(file)
+            text = ""
+            for page in pdf_reader.pages:
+                text += page.extract_text()
+        
+        print(f"DEBUG PDF: Extracted text length: {len(text)}")
+        
+        # Check if this is an exported clinical record PDF
+        if "Cartella Clinica Elettronica" not in text or "EarlyCare Gateway" not in text:
+            print("DEBUG PDF: Not an exported clinical record PDF")
+            return None
+        
+        print("DEBUG PDF: This is an exported clinical record PDF")
+        records = []
+        
+        # Split by "Scheda Clinica #" to find individual records
+        record_pattern = r'Scheda Clinica #(\d+) - ([\d/]+ [\d:]+)'
+        matches = list(re.finditer(record_pattern, text))
+        
+        print(f"DEBUG PDF: Found {len(matches)} schede cliniche")
+        
+        for i, match in enumerate(matches):
+            start_pos = match.start()
+            end_pos = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+            record_text = text[start_pos:end_pos]
+            
+            print(f"\nDEBUG PDF: Processing record #{i+1}")
+            print(f"DEBUG PDF: Record text length: {len(record_text)}")
+            print(f"DEBUG PDF: Record text preview: {record_text[:200]}...")
+            
+            # Extract fields using regex
+            encounter_id_match = re.search(r'ID Incontro:\s*(.+?)(?:\n|Motivo)', record_text)
+            chief_complaint_match = re.search(r'Motivo Principale:\s*(.+?)(?:\n|Sintomi)', record_text)
+            symptoms_match = re.search(r'Sintomi:\s*(.+?)(?:\n|Priorit)', record_text)
+            priority_match = re.search(r'Priorità:\s*(.+?)(?:\n|Pressione|Note|Scheda)', record_text)
+            
+            # Extract vital signs
+            bp_match = re.search(r'Pressione Sanguigna:\s*(.+?)(?:\n|Frequenza)', record_text)
+            hr_match = re.search(r'Frequenza Cardiaca:\s*(.+?)(?:\n|Temperatura)', record_text)
+            temp_match = re.search(r'Temperatura:\s*(.+?)°C', record_text)
+            o2_match = re.search(r'Saturazione O2:\s*(.+?)(?:\n|Frequenza)', record_text)
+            rr_match = re.search(r'Frequenza Respiratoria:\s*(.+?)(?:\n|Note|Scheda)', record_text)
+            
+            # Extract notes
+            notes_match = re.search(r'Note:\s*(.+?)(?:Scheda Clinica #|Documento generato|\Z)', record_text, re.DOTALL)
+            
+            # Parse timestamp
+            timestamp_str = match.group(2)
+            try:
+                timestamp = datetime.strptime(timestamp_str, '%d/%m/%Y %H:%M:%S')
+            except:
+                timestamp = datetime.now()
+            
+            # Generate unique encounter_id for each import to avoid duplicates
+            unique_encounter_id = f'ENC-IMPORTED-{datetime.now().strftime("%Y%m%d%H%M%S")}-{i}'
+            
+            record = {
+                'timestamp': timestamp.isoformat(),
+                'encounter_id': unique_encounter_id,
+                'motivo_tipo': 'Importato da PDF',
+                'motivo': chief_complaint_match.group(1).strip() if chief_complaint_match else 'N/A',
+                'chief_complaint': chief_complaint_match.group(1).strip() if chief_complaint_match else 'N/A',
+                'symptoms': symptoms_match.group(1).strip() if symptoms_match else '',
+                'notes': notes_match.group(1).strip() if notes_match else '',
+                'priority': priority_match.group(1).strip() if priority_match else 'routine',
+                'vital_signs': {
+                    'blood_pressure': bp_match.group(1).strip() if bp_match else '',
+                    'heart_rate': hr_match.group(1).strip() if hr_match else '',
+                    'temperature': temp_match.group(1).strip() if temp_match else '',
+                    'oxygen_saturation': o2_match.group(1).strip() if o2_match else '',
+                    'respiratory_rate': rr_match.group(1).strip() if rr_match else ''
+                },
+                'attachments': [],
+                'doctor_name': 'Importato da PDF',
+                'doctor_specialization': '',
+                'original_encounter_id': encounter_id_match.group(1).strip() if encounter_id_match else 'N/A'
+            }
+            
+            print(f"DEBUG PDF: Record extracted - ID: {record['encounter_id']}, Motivo: {record['motivo']}")
+            records.append(record)
+        
+        print(f"DEBUG PDF: Total records extracted: {len(records)}")
+        return records if records else None
+        
+    except Exception as e:
+        print(f"Error extracting records from PDF: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 # ========== AUTHENTICATION ROUTES ==========
 
@@ -535,11 +636,34 @@ def add_clinical_record(fiscal_code):
                 upload_folder = app.config['UPLOAD_FOLDER'] / fiscal_code / datetime.now().strftime('%Y%m%d_%H%M%S')
                 upload_folder.mkdir(parents=True, exist_ok=True)
                 
+                pdf_records_imported = 0
                 for file in files:
                     if file and file.filename:
                         filename = secure_filename(file.filename)
                         filepath = upload_folder / filename
                         file.save(filepath)
+                        
+                        # Check if it's a PDF and try to extract clinical records
+                        if filename.lower().endswith('.pdf'):
+                            extracted_records = extract_clinical_records_from_pdf(str(filepath))
+                            if extracted_records:
+                                # Import each record as a separate clinical record
+                                for record in extracted_records:
+                                    record['doctor_id'] = doctor_id
+                                    record['doctor_name'] = f"{doctor_data.get('nome', '')} {doctor_data.get('cognome', '')}" if doctor_data else 'Importato da PDF'
+                                    record['doctor_specialization'] = doctor_data.get('specializzazione', '') if doctor_data else ''
+                                    db.add_clinical_record(fiscal_code, record)
+                                    pdf_records_imported += 1
+                                
+                                # If we imported records from PDF, skip creating a new record from form
+                                if pdf_records_imported > 0:
+                                    return jsonify({
+                                        'success': True, 
+                                        'message': f'{pdf_records_imported} schede cliniche importate dal PDF con successo',
+                                        'imported_count': pdf_records_imported
+                                    })
+                        
+                        # If not a clinical record PDF, treat as normal attachment
                         attachments.append({
                             'name': filename,
                             'path': str(filepath),
@@ -600,6 +724,7 @@ def upload_folder():
         # Save all files
         saved_files = []
         attachments = []
+        pdf_files = []
         for file in files:
             if file.filename:
                 filename = secure_filename(file.filename)
@@ -612,6 +737,38 @@ def upload_folder():
                     'size': filepath.stat().st_size,
                     'type': file.content_type or 'application/octet-stream'
                 })
+                
+                # Track PDF files for later extraction
+                if filename.lower().endswith('.pdf'):
+                    pdf_files.append(str(filepath))
+        
+        # Check if any PDF files contain exported clinical records
+        extracted_records_count = 0
+        for pdf_path in pdf_files:
+            print(f"Checking PDF for clinical records: {pdf_path}")
+            extracted_records = extract_clinical_records_from_pdf(pdf_path)
+            if extracted_records:
+                print(f"✅ Found {len(extracted_records)} clinical records in PDF")
+                # Get current doctor from session
+                doctor_id = session.get('doctor_id')
+                doctor_data = db.find_doctor_by_id(doctor_id) if doctor_id and db_connected else None
+                
+                # Import each record as a separate clinical record
+                for record in extracted_records:
+                    record['doctor_id'] = doctor_id
+                    record['doctor_name'] = f"{doctor_data.get('nome', '')} {doctor_data.get('cognome', '')}" if doctor_data else 'Importato da PDF'
+                    record['doctor_specialization'] = doctor_data.get('specializzazione', '') if doctor_data else ''
+                    db.add_clinical_record(fiscal_code, record)
+                    extracted_records_count += 1
+                    print(f"✅ Imported record: {record.get('chief_complaint', 'N/A')}")
+        
+        # If we extracted records from PDF, return success message
+        if extracted_records_count > 0:
+            return jsonify({
+                'success': True,
+                'message': f'{extracted_records_count} schede cliniche importate dal PDF con successo',
+                'imported_count': extracted_records_count
+            })
         
         # Process folder
         if processor:

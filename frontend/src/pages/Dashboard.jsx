@@ -494,11 +494,6 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                   {foundPatient.age && (
                     <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: '0.25rem 0' }}>Età: {foundPatient.age} anni</p>
                   )}
-                  {foundPatient.malattie_permanenti && foundPatient.malattie_permanenti.length > 0 && (
-                    <p style={{ color: '#ef4444', fontSize: '0.85rem', marginTop: '0.5rem' }}>
-                      ⚠️ Malattie: {foundPatient.malattie_permanenti.join(', ')}
-                    </p>
-                  )}
                 </div>
               ) : (
                 <p style={{ color: '#667eea', fontStyle: 'italic' }}>Nessun paziente selezionato</p>
