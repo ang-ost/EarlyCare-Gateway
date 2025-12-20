@@ -556,6 +556,52 @@ class MongoDBPatientRepository:
             logger.error(f"Error adding clinical record: {e}")
             return False
     
+    def delete_clinical_records(self, codice_fiscale: str, indexes: List[int]) -> bool:
+        """
+        Delete multiple clinical records from a patient by their indexes.
+        
+        Args:
+            codice_fiscale: Patient fiscal code
+            indexes: List of record indexes to delete
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Get all records for this patient (sorted by timestamp descending)
+            records = list(self.patient_records_collection.find(
+                {"patient.codice_fiscale": codice_fiscale}
+            ).sort("encounter_timestamp", -1))
+            
+            if not records:
+                logger.warning(f"No clinical records found for patient: {codice_fiscale}")
+                return False
+            
+            # Validate indexes
+            for idx in indexes:
+                if idx < 0 or idx >= len(records):
+                    logger.error(f"Invalid index {idx} for patient {codice_fiscale}")
+                    return False
+            
+            # Get encounter_ids for the records to delete
+            encounter_ids_to_delete = [records[idx]['encounter_id'] for idx in indexes]
+            
+            # Delete records from collection
+            result = self.patient_records_collection.delete_many(
+                {'encounter_id': {'$in': encounter_ids_to_delete}}
+            )
+            
+            if result.deleted_count > 0:
+                logger.info(f"Deleted {result.deleted_count} clinical record(s) for patient: {codice_fiscale}")
+                return True
+            else:
+                logger.warning(f"No records were deleted for patient: {codice_fiscale}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error deleting clinical records: {e}")
+            return False
+    
     # Patient Record operations
     
     def save_patient_record(self, record: PatientRecord) -> bool:

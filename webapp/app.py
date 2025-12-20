@@ -471,6 +471,40 @@ def get_patient_records(fiscal_code):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/patient/<fiscal_code>/records/delete', methods=['DELETE'])
+@require_login
+def delete_clinical_records(fiscal_code):
+    """Delete multiple clinical records from a patient."""
+    if not db_connected:
+        return jsonify({'error': 'Database non connesso'}), 500
+    
+    try:
+        data = request.json
+        indexes = data.get('indexes', [])
+        
+        if not indexes:
+            return jsonify({'error': 'Nessuna scheda selezionata'}), 400
+        
+        # Get patient data
+        patient_data = db.find_by_fiscal_code(fiscal_code)
+        if not patient_data:
+            return jsonify({'error': 'Paziente non trovato'}), 404
+        
+        # Delete records by indexes
+        success = db.delete_clinical_records(fiscal_code, indexes)
+        
+        if success:
+            return jsonify({
+                'success': True, 
+                'message': f'{len(indexes)} scheda/e clinica/che eliminata/e con successo'
+            })
+        else:
+            return jsonify({'error': 'Errore durante l\'eliminazione delle schede'}), 500
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/patient/<fiscal_code>/add-record', methods=['POST'])
 @require_login
 def add_clinical_record(fiscal_code):

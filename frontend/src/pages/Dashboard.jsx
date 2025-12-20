@@ -14,6 +14,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
   const [clinicalRecords, setClinicalRecords] = useState([])
   const [expandedRecord, setExpandedRecord] = useState(null)
   const [selectedRecord, setSelectedRecord] = useState(null)
+  const [selectedRecords, setSelectedRecords] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [toast, setToast] = useState(null)
@@ -659,6 +660,63 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', gap: '1rem' }}>
               <h3 style={{ margin: 0, color: '#667eea' }}>📋 Schede Cliniche</h3>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                {selectedRecords.length > 0 && (
+                  <button
+                    className="btn"
+                    onClick={async () => {
+                      if (!confirm(`Sei sicuro di voler eliminare ${selectedRecords.length} scheda/e clinica/che?`)) {
+                        return
+                      }
+                      
+                      setLoading(true)
+                      try {
+                        const fiscalCode = foundPatient.codice_fiscale || foundPatient.fiscal_code
+                        const res = await fetch(`/api/patient/${fiscalCode}/records/delete`, {
+                          method: 'DELETE',
+                          headers: { 'Content-Type': 'application/json' },
+                          credentials: 'include',
+                          body: JSON.stringify({ indexes: selectedRecords })
+                        })
+                        
+                        const data = await res.json()
+                        if (!res.ok) {
+                          setToast({ type: 'error', message: data.error || 'Errore nell\'eliminazione', icon: '❌' })
+                          return
+                        }
+                        
+                        setToast({ type: 'success', message: `${selectedRecords.length} scheda/e eliminata/e con successo`, icon: '✅' })
+                        setSelectedRecords([])
+                        setSelectedRecord(null)
+                        
+                        // Ricarica le schede cliniche
+                        const recordsRes = await fetch(`/api/patient/${fiscalCode}/records`, {
+                          credentials: 'include'
+                        })
+                        if (recordsRes.ok) {
+                          const recordsData = await recordsRes.json()
+                          setClinicalRecords(recordsData.records || [])
+                        }
+                      } catch (err) {
+                        setToast({ type: 'error', message: 'Errore di connessione: ' + err.message, icon: '❌' })
+                      } finally {
+                        setLoading(false)
+                      }
+                    }}
+                    style={{
+                      background: '#ef4444',
+                      color: 'white',
+                      border: 'none',
+                      padding: '0.5rem 1rem',
+                      fontSize: '0.9rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      boxShadow: '0 4px 6px rgba(239, 68, 68, 0.3)'
+                    }}
+                  >
+                    🗑️ Elimina ({selectedRecords.length})
+                  </button>
+                )}
                 {selectedRecord !== null && (
                   <button
                     className="btn btn-primary"
@@ -695,27 +753,47 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                 {clinicalRecords.map((record, idx) => (
                   <div
                     key={idx}
-                    onClick={(e) => {
-                      // Se clicco sul box, seleziono/deseleziono la scheda
-                      if (selectedRecord === idx) {
-                        setSelectedRecord(null)
-                      } else {
-                        setSelectedRecord(idx)
-                      }
-                      // Toggle espansione
-                      setExpandedRecord(expandedRecord === idx ? null : idx)
-                    }}
                     style={{
                       padding: '1rem',
-                      border: selectedRecord === idx ? '3px solid #667eea' : '1px solid #e5e7eb',
+                      border: selectedRecord === idx ? '3px solid #667eea' : (selectedRecords.includes(idx) ? '2px solid #f59e0b' : '1px solid #e5e7eb'),
                       borderRadius: '0.5rem',
-                      background: selectedRecord === idx ? 'linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%)' : (expandedRecord === idx ? '#f0f4ff' : 'white'),
+                      background: selectedRecord === idx ? 'linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%)' : (selectedRecords.includes(idx) ? '#fef3c7' : (expandedRecord === idx ? '#f0f4ff' : 'white')),
                       cursor: 'pointer',
                       transition: 'all 0.3s',
-                      boxShadow: selectedRecord === idx ? '0 4px 12px rgba(102, 126, 234, 0.2)' : 'none',
+                      boxShadow: selectedRecord === idx ? '0 4px 12px rgba(102, 126, 234, 0.2)' : (selectedRecords.includes(idx) ? '0 2px 8px rgba(245, 158, 11, 0.2)' : 'none'),
                       position: 'relative'
                     }}
                   >
+                    {/* Checkbox per selezione multipla */}
+                    <div 
+                      style={{
+                        position: 'absolute',
+                        top: '0.5rem',
+                        left: '0.5rem',
+                        zIndex: 10
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedRecords.includes(idx)}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          if (selectedRecords.includes(idx)) {
+                            setSelectedRecords(selectedRecords.filter(i => i !== idx))
+                          } else {
+                            setSelectedRecords([...selectedRecords, idx])
+                          }
+                        }}
+                        style={{
+                          width: '20px',
+                          height: '20px',
+                          cursor: 'pointer',
+                          accentColor: '#667eea'
+                        }}
+                      />
+                    </div>
+                    
                     {selectedRecord === idx && (
                       <div style={{
                         position: 'absolute',
@@ -735,7 +813,17 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                       </div>
                     )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                      <div style={{ flex: 1 }}>
+                      <div 
+                        onClick={(e) => {
+                          // Clicco sul contenuto per selezionare la scheda
+                          if (selectedRecord === idx) {
+                            setSelectedRecord(null)
+                          } else {
+                            setSelectedRecord(idx)
+                          }
+                        }}
+                        style={{ flex: 1, paddingLeft: '2rem', cursor: 'pointer' }}
+                      >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
                           <span style={{ fontSize: '1.2rem' }}>{record.motivo_tipo === 'Ricovero' ? '🛏️' : '🏥'}</span>
                           <p style={{ fontWeight: '600', margin: 0 }}>{record.motivo_tipo || record.tipo_scheda}</p>
@@ -754,9 +842,26 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                           </p>
                         )}
                       </div>
-                      <span style={{ color: '#667eea', fontSize: '1rem' }}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setExpandedRecord(expandedRecord === idx ? null : idx)
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#667eea',
+                          fontSize: '1.2rem',
+                          cursor: 'pointer',
+                          padding: '0.5rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'transform 0.3s'
+                        }}
+                      >
                         {expandedRecord === idx ? '▼' : '▶'}
-                      </span>
+                      </button>
                     </div>
 
                     {expandedRecord === idx && (
