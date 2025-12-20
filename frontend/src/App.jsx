@@ -56,8 +56,8 @@ export default function App() {
       {currentPage === 'dashboard' && <Dashboard user={user} onNavigate={setCurrentPage} onLogout={handleLogout} />}
       {currentPage === 'profile' && <Profile user={user} onNavigate={setCurrentPage} onLogout={handleLogout} />}
       
-      {/* Medical Chatbot - disponibile sempre */}
-      <MedicalChatbot />
+      {/* Medical Chatbot - solo quando loggato */}
+      {user && <MedicalChatbot />}
     </>
   )
 }
