@@ -54,6 +54,9 @@ pymongo>=4.6.0  # MongoDB
 Flask>=3.0.0
 Werkzeug>=3.0.0
 
+# PDF processing
+PyPDF2>=3.0.0
+
 # AI - Google Gemini for medical diagnostics
 google-generativeai>=0.3.0
 

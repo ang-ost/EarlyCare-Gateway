@@ -47,14 +47,23 @@ class StrategySelector:
         Returns:
             Selected ModelStrategy instance
         """
+        print(f"\n🔍 Selecting strategy from {len(self.strategies)} registered strategies")
+        
         applicable_strategies = [
             strategy for strategy in self.strategies
             if strategy.can_handle(record, context)
         ]
         
+        print(f"   Found {len(applicable_strategies)} applicable strategies")
+        if applicable_strategies:
+            print(f"   Strategies: {[s.strategy_name for s in applicable_strategies]}")
+        
         if not applicable_strategies:
+            print(f"   No applicable strategies found")
             if self.default_strategy:
+                print(f"   Using default strategy: {self.default_strategy.strategy_name}")
                 return self.default_strategy
+            print(f"   ❌ No default strategy set!")
             raise ValueError("No applicable strategy found and no default strategy set")
         
         # If ensemble mode is enabled and multiple strategies apply, use ensemble
@@ -64,7 +73,9 @@ class StrategySelector:
         # Otherwise, select the most confident strategy
         # For now, just return the first applicable one
         # In production, could rank by confidence or specificity
-        return applicable_strategies[0]
+        selected = applicable_strategies[0]
+        print(f"   ✅ Selected strategy: {selected.strategy_name}")
+        return selected
     
     def get_available_strategies(self) -> List[str]:
         """Get list of registered strategy names."""
@@ -74,6 +85,9 @@ class StrategySelector:
     def create_default_selector(cls) -> 'StrategySelector':
         """Create a selector with default strategies."""
         selector = cls()
+        
+        # Create general strategy first (will be both registered and default)
+        general_strategy = DomainStrategy("general")
         
         # Register domain strategies
         selector.register_strategy(DomainStrategy("cardiology"))
@@ -91,7 +105,10 @@ class StrategySelector:
         selector.register_strategy(PathologyStrategy("cancer"))
         selector.register_strategy(PathologyStrategy("tissue"))
         
-        # Set a general domain strategy as default
-        selector.set_default_strategy(DomainStrategy("general"))
+        # Register general strategy (accepts everything)
+        selector.register_strategy(general_strategy)
+        
+        # Set general domain strategy as default fallback
+        selector.set_default_strategy(general_strategy)
         
         return selector

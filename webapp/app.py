@@ -117,9 +117,8 @@ def initialize_system():
             # Gateway doesn't support observer pattern, skip
             print("Gateway doesn't support observer pattern")
         
-        # Setup strategy selector
-        selector = StrategySelector()
-        gateway.set_strategy_selector(selector)
+        # Gateway already has default strategy selector initialized in __init__
+        # No need to override it unless we want custom strategies
         
         return True
     except Exception as e:
@@ -562,33 +561,98 @@ def upload_folder():
         
         # Save all files
         saved_files = []
+        attachments = []
         for file in files:
             if file.filename:
                 filename = secure_filename(file.filename)
                 filepath = temp_folder / filename
                 file.save(filepath)
                 saved_files.append(str(filepath))
+                attachments.append({
+                    'name': filename,
+                    'path': str(filepath),
+                    'size': filepath.stat().st_size,
+                    'type': file.content_type or 'application/octet-stream'
+                })
         
         # Process folder
         if processor:
             results = processor.process_folder(str(temp_folder))
             
+            # Get current doctor from session
+            doctor_id = session.get('doctor_id')
+            doctor_data = db.find_doctor_by_id(doctor_id) if doctor_id and db_connected else None
+            
             # Save results if database is connected
             if db_connected and fiscal_code:
-                # Add processing results to patient record
+                # Convert DecisionSupport results to clinical record format
+                top_diagnosis = results.get_top_diagnosis()
+                
+                # Extract file content for notes
+                notes_content = []
+                for filepath in saved_files:
+                    try:
+                        file_path = Path(filepath)
+                        if file_path.suffix.lower() in ['.txt', '.md', '.note']:
+                            with open(filepath, 'r', encoding='utf-8') as f:
+                                notes_content.append(f"=== {file_path.name} ===\n{f.read()}\n")
+                        elif file_path.suffix.lower() == '.pdf':
+                            notes_content.append(f"=== {file_path.name} ===\n[File PDF caricato]\n")
+                    except:
+                        pass
+                
+                # Create clinical record from processing results
                 record = {
                     'timestamp': datetime.now().isoformat(),
-                    'type': 'folder_processing',
-                    'results': results,
-                    'files': saved_files
+                    'motivo_tipo': 'Caricamento File',
+                    'motivo': f'File caricati e processati automaticamente ({len(files)} file)',
+                    'tipo_scheda': 'Caricamento File',
+                    'chief_complaint': f'Processamento automatico di {len(files)} file clinici',
+                    'symptoms': '\n'.join(results.clinical_notes) if results.clinical_notes else '',
+                    'diagnosis': top_diagnosis.condition if top_diagnosis else 'In analisi',
+                    'treatment': '\n'.join([f"- {test}" for test in top_diagnosis.recommended_tests]) if top_diagnosis and top_diagnosis.recommended_tests else '',
+                    'notes': '\n'.join(notes_content) if notes_content else f'File processati: {", ".join([Path(f).name for f in saved_files])}',
+                    'vital_signs': {},
+                    'attachments': attachments,
+                    'lab_results': [],
+                    'imaging': [],
+                    'doctor_id': doctor_id,
+                    'doctor_name': f"{doctor_data.get('nome', '')} {doctor_data.get('cognome', '')}" if doctor_data else 'Sistema Automatico',
+                    'doctor_specialization': doctor_data.get('specializzazione', '') if doctor_data else 'AI Processing',
+                    # Additional metadata
+                    'ai_processing': {
+                        'model_used': results.models_used,
+                        'processing_time_ms': results.processing_time_ms,
+                        'confidence': top_diagnosis.confidence_score if top_diagnosis else 0.0,
+                        'alerts': results.alerts,
+                        'warnings': results.warnings,
+                        'all_diagnoses': [
+                            {
+                                'condition': d.condition,
+                                'confidence': d.confidence_score,
+                                'evidence': d.evidence
+                            } for d in results.diagnoses
+                        ]
+                    }
                 }
+                
                 db.add_clinical_record(fiscal_code, record)
-            
-            return jsonify({'success': True, 'results': results})
+                
+                return jsonify({
+                    'success': True, 
+                    'message': f'{len(files)} file processati e convertiti in scheda clinica',
+                    'diagnosis': top_diagnosis.condition if top_diagnosis else None,
+                    'confidence': top_diagnosis.confidence_score if top_diagnosis else 0.0
+                })
+            else:
+                return jsonify({'error': 'Database non connesso'}), 500
         else:
             return jsonify({'error': 'Processore non inizializzato'}), 500
             
     except Exception as e:
+        import traceback
+        print(f"Error in upload_folder: {e}")
+        print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 
 

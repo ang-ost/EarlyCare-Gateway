@@ -25,6 +25,9 @@ class ClinicalGateway(MonitoringSubject):
         
         # Set up default processing chain
         self._setup_default_chain()
+        
+        # Set up default strategy selector
+        self._setup_default_strategy_selector()
     
     def _setup_default_chain(self):
         """Set up the default processing chain."""
@@ -38,6 +41,16 @@ class ClinicalGateway(MonitoringSubject):
         
         # Store the chain (starting with first handler)
         self.chain_handlers = [validation, enrichment, triage]
+    
+    def _setup_default_strategy_selector(self):
+        """Set up the default strategy selector."""
+        try:
+            self.strategy_selector = StrategySelector.create_default_selector()
+            print(f"✅ Strategy selector initialized with {len(self.strategy_selector.strategies)} strategies")
+            print(f"   Default strategy: {self.strategy_selector.default_strategy.strategy_name if self.strategy_selector.default_strategy else 'None'}")
+        except Exception as e:
+            print(f"❌ Failed to initialize strategy selector: {e}")
+            self.strategy_selector = None
     
     def set_processing_chain(self, handlers: List[ChainHandler]):
         """

@@ -181,6 +181,64 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
     }
   }
 
+  const handleUploadFiles = async (files) => {
+    if (!foundPatient) {
+      setToast({ type: 'warning', message: 'Seleziona prima un paziente', icon: '⚠️' })
+      return
+    }
+
+    if (!files || files.length === 0) {
+      return
+    }
+
+    setLoading(true)
+    setToast({ type: 'info', message: `Caricamento e conversione di ${files.length} file in corso...`, icon: '⏳' })
+
+    try {
+      const formData = new FormData()
+      formData.append('fiscal_code', foundPatient.codice_fiscale || foundPatient.fiscal_code)
+      
+      files.forEach((file) => {
+        formData.append('files[]', file)
+      })
+
+      const res = await fetch('/api/folder/upload', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        setToast({ type: 'error', message: data.error || 'Errore nel caricamento', icon: '❌' })
+        return
+      }
+
+      // Mostra risultato con diagnosi se disponibile
+      let successMessage = data.message || 'File convertiti e aggiunti alle schede cliniche!'
+      if (data.diagnosis && data.confidence) {
+        successMessage += ` | Diagnosi: ${data.diagnosis} (${(data.confidence * 100).toFixed(0)}%)`
+      }
+      
+      setToast({ type: 'success', message: successMessage, icon: '✅' })
+      setUploadedFiles([])
+
+      // Ricarica le schede cliniche
+      const fiscalCode = foundPatient.codice_fiscale || foundPatient.fiscal_code
+      const recordsRes = await fetch(`/api/patient/${fiscalCode}/records`, {
+        credentials: 'include'
+      })
+      if (recordsRes.ok) {
+        const recordsData = await recordsRes.json()
+        setClinicalRecords(recordsData.records || [])
+      }
+    } catch (err) {
+      setToast({ type: 'error', message: 'Errore di connessione: ' + err.message, icon: '❌' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleAddRecord = async (e) => {
     e.preventDefault()
     if (!foundPatient) {
@@ -510,19 +568,39 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                 <div style={{ marginTop: '1rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                     <p style={{ fontWeight: '600', color: '#667eea' }}>📎 File caricati ({uploadedFiles.length})</p>
-                    <button 
-                      onClick={() => setUploadedFiles([])}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#ef4444',
-                        cursor: 'pointer',
-                        padding: '0.25rem 0.5rem',
-                        fontSize: '0.85rem'
-                      }}
-                    >
-                      🗑️ Rimuovi tutti
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button 
+                        onClick={() => handleUploadFiles(uploadedFiles)}
+                        className="btn btn-primary"
+                        disabled={loading}
+                        style={{
+                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          border: 'none',
+                          color: 'white',
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                          padding: '0.5rem 1rem',
+                          fontSize: '0.85rem',
+                          borderRadius: '0.5rem',
+                          fontWeight: '600',
+                          opacity: loading ? 0.6 : 1
+                        }}
+                      >
+                        {loading ? '⏳ Elaborazione...' : '🔄 Converti e Carica'}
+                      </button>
+                      <button 
+                        onClick={() => setUploadedFiles([])}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#ef4444',
+                          cursor: 'pointer',
+                          padding: '0.25rem 0.5rem',
+                          fontSize: '0.85rem'
+                        }}
+                      >
+                        🗑️ Rimuovi tutti
+                      </button>
+                    </div>
                   </div>
                   <div style={{ 
                     display: 'flex', 
