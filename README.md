@@ -65,7 +65,26 @@ EarlyCare-Gateway/
 
 ## 🚀 Quick Start
 
-### Installation
+### Opzione 1: Docker (Consigliato) 🐳
+
+Il modo più semplice per avviare EarlyCare Gateway è usando Docker:
+
+```bash
+# Avvia tutti i servizi (Backend, Frontend, MongoDB)
+docker-compose up -d
+
+# Verifica lo stato
+docker-compose ps
+```
+
+Accedi all'applicazione:
+- **Frontend**: http://localhost
+- **Backend API**: http://localhost:5000
+- **MongoDB**: localhost:27017
+
+Per maggiori dettagli, consulta la sezione [Docker Setup](#-docker-setup) più avanti.
+
+### Opzione 2: Installazione Manuale
 
 ```bash
 # Clone the repository
@@ -1082,6 +1101,194 @@ GB2A5K               Giovanni        Bianchi         2025-12-06 14:30:15
 - [ ] Real-time notifications
 - [ ] Complete REST API
 - [ ] WebSocket integration
+
+---
+
+## 🐳 Docker Setup
+
+EarlyCare Gateway può essere eseguito completamente con Docker per una configurazione semplice e veloce.
+
+### Prerequisiti
+
+- Docker Desktop installato e in esecuzione
+- Estensione Docker per VS Code (opzionale ma consigliata)
+
+### Struttura File Docker
+
+- `Dockerfile` - Configurazione per il backend Python/Flask
+- `frontend/Dockerfile` - Configurazione per il frontend React/Vite
+- `docker-compose.yml` - Orchestrazione di tutti i servizi
+- `.dockerignore` - File da escludere dal build
+
+### Configurazione
+
+#### 1. Variabili d'Ambiente
+
+Crea un file `.env` nella root del progetto con le seguenti variabili:
+
+```env
+# API Keys
+GEMINI_API_KEY=la-tua-chiave-gemini
+CHATBOT_GEMINI_API_KEY=la-tua-chiave-chatbot
+
+# Flask Configuration
+FLASK_SECRET_KEY=genera-una-chiave-segreta-sicura
+
+# MongoDB Configuration (già configurato in docker-compose.yml)
+MONGODB_CONNECTION_STRING=mongodb://admin:admin123@mongodb:27017/
+MONGODB_DATABASE_NAME=earlycare_db
+```
+
+#### 2. Generare una chiave segreta per Flask
+
+Puoi generare una chiave segreta sicura con:
+
+```bash
+python -c "import secrets; print(secrets.token_hex(32))"
+```
+
+### Comandi Docker
+
+#### Avviare tutti i servizi
+
+```bash
+docker-compose up -d
+```
+
+Questo comando avvierà:
+- MongoDB (porta 27017)
+- Backend Flask (porta 5000)
+- Frontend React (porta 80)
+
+#### Vedere i log
+
+```bash
+# Tutti i servizi
+docker-compose logs -f
+
+# Solo un servizio specifico
+docker-compose logs -f backend
+docker-compose logs -f frontend
+docker-compose logs -f mongodb
+```
+
+#### Fermare i servizi
+
+```bash
+docker-compose down
+```
+
+#### Fermare e rimuovere i volumi (⚠️ cancella i dati del database)
+
+```bash
+docker-compose down -v
+```
+
+#### Ricostruire le immagini
+
+```bash
+docker-compose build --no-cache
+docker-compose up -d
+```
+
+### Accesso ai Servizi
+
+Una volta avviati i container:
+
+- **Frontend**: http://localhost
+- **Backend API**: http://localhost:5000
+- **MongoDB**: localhost:27017 (username: admin, password: admin123)
+
+### Verifica Stato dei Container
+
+#### Con l'estensione Docker di VS Code
+
+1. Clicca sull'icona Docker nella barra laterale
+2. Espandi "Containers"
+3. Vedrai tutti i container in esecuzione
+4. Click destro su un container per:
+   - Vedere i log
+   - Aprire una shell
+   - Fermare/Riavviare il container
+   - Ispezionare il container
+
+#### Da linea di comando
+
+```bash
+# Lista dei container in esecuzione
+docker-compose ps
+
+# Stato di salute dei servizi
+docker ps
+```
+
+### Troubleshooting
+
+#### Il backend non si connette a MongoDB
+
+Verifica che MongoDB sia in esecuzione e healthy:
+
+```bash
+docker-compose logs mongodb
+```
+
+#### Errori di build
+
+Pulisci tutto e ricostruisci:
+
+```bash
+docker-compose down -v
+docker system prune -a
+docker-compose build --no-cache
+docker-compose up -d
+```
+
+#### Vedere cosa succede dentro un container
+
+```bash
+docker-compose exec backend bash
+docker-compose exec frontend sh
+docker-compose exec mongodb mongosh
+```
+
+### Sviluppo
+
+Per sviluppare con hot-reload, puoi modificare il docker-compose.yml per montare il codice sorgente come volume:
+
+```yaml
+backend:
+  volumes:
+    - .:/app
+    - /app/.venv  # Esclude l'ambiente virtuale locale
+```
+
+### Note sulla Sicurezza
+
+⚠️ **IMPORTANTE PER LA PRODUZIONE**:
+
+1. Cambia la password di MongoDB da `admin123` a qualcosa di sicuro
+2. Usa una `FLASK_SECRET_KEY` generata in modo sicuro
+3. Attiva HTTPS per il frontend
+4. Non committare il file `.env` nel repository
+5. Usa Docker secrets per gestire le credenziali sensibili
+
+### Backup del Database
+
+```bash
+# Backup
+docker-compose exec mongodb mongodump --out=/data/backup
+
+# Restore
+docker-compose exec mongodb mongorestore /data/backup
+```
+
+### Pulizia
+
+Per rimuovere tutto (container, immagini, volumi):
+
+```bash
+docker-compose down -v --rmi all
+```
 
 ---
 
