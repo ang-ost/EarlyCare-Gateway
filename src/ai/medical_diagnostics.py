@@ -1,7 +1,7 @@
 """
-Medical Diagnostics AI Module with Multiple Provider Support
+Medical Diagnostics AI Module
 Provides AI-powered medical diagnostics based on patient clinical records
-Supports: Google Gemini, OpenAI GPT (fallback)
+Powered by Google Gemini
 """
 
 import google.generativeai as genai
@@ -17,34 +17,19 @@ class MedicalDiagnosticsAI:
     Analyzes patient clinical data and provides diagnostic insights.
     """
     
-    def __init__(self, api_key: str, openai_api_key: Optional[str] = None):
+    def __init__(self, api_key: str):
         """
         Initialize the Medical Diagnostics AI.
         
         Args:
             api_key: Google Gemini API key
-            openai_api_key: Optional OpenAI API key for fallback
         """
         self.api_key = api_key
-        self.openai_api_key = openai_api_key
         
         # Configure Gemini
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('gemini-2.5-flash')
         self.model_name = 'gemini-2.5-flash'
-        
-        # Try to import OpenAI if key is provided
-        self.openai_available = False
-        if openai_api_key:
-            try:
-                import openai
-                self.openai_client = openai.OpenAI(api_key=openai_api_key)
-                self.openai_available = True
-                print("✅ OpenAI fallback disponibile")
-            except ImportError:
-                print("⚠️ OpenAI non disponibile (installa: pip install openai)")
-            except Exception as e:
-                print(f"⚠️ OpenAI fallback non configurato: {e}")
         
         # System prompt for medical diagnostics
         self.system_prompt = """Sei un assistente medico AI per diagnostica clinica e supporto decisionale.
@@ -92,7 +77,7 @@ Tempi recupero, possibili complicanze.
     def generate_diagnosis(self, patient_data: Dict) -> Dict:
         """
         Generate a medical diagnosis based on patient clinical data.
-        Implements retry logic and fallback to OpenAI if Gemini fails.
+        Implements retry logic with exponential backoff.
         
         Args:
             patient_data: Dictionary containing patient information and clinical data
@@ -109,13 +94,9 @@ Tempi recupero, possibili complicanze.
             except Exception as e:
                 print(f"[AI] Tentativo Gemini {attempt + 1}/{max_retries} fallito: {e}")
                 
-                # If last attempt or OpenAI not available, raise error
+                # If last attempt, raise error
                 if attempt == max_retries - 1:
-                    if self.openai_available:
-                        print(f"[AI] Gemini non disponibile, uso OpenAI come fallback...")
-                        return self._generate_with_openai(patient_data)
-                    else:
-                        raise
+                    raise
                 
                 # Wait before retry with exponential backoff
                 wait_time = retry_delay * (2 ** attempt)
@@ -181,49 +162,6 @@ Fornisci ora una valutazione diagnostica completa e strutturata."""
                 'analysis_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 'data_points_analyzed': self._count_data_points(patient_data),
                 'finish_reason': str(finish_reason) if finish_reason else 'COMPLETE'
-            }
-        }
-        
-        return result
-    
-    def _generate_with_openai(self, patient_data: Dict) -> Dict:
-        """Generate diagnosis using OpenAI GPT API as fallback."""
-        if not self.openai_available:
-            raise Exception("OpenAI non disponibile come fallback")
-        
-        # Format patient data
-        formatted_data = self._format_patient_data(patient_data)
-        
-        # Create message for OpenAI
-        messages = [
-            {"role": "system", "content": self.system_prompt},
-            {"role": "user", "content": f"""DATI CLINICI DEL PAZIENTE:
-
-{formatted_data}
-
-Fornisci ora una valutazione diagnostica completa e strutturata."""}
-        ]
-        
-        print(f"[AI] Calling OpenAI API...")
-        response = self.openai_client.chat.completions.create(
-            model="gpt-4o-mini",  # Cost-effective model
-            messages=messages,
-            temperature=0.3,
-            max_tokens=2048
-        )
-        
-        diagnosis_text = response.choices[0].message.content
-        
-        result = {
-            'success': True,
-            'diagnosis': diagnosis_text,
-            'timestamp': datetime.now().isoformat(),
-            'patient_id': patient_data.get('patient_id', 'N/A'),
-            'model': 'gpt-4o-mini (fallback)',
-            'metadata': {
-                'analysis_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'data_points_analyzed': self._count_data_points(patient_data),
-                'finish_reason': response.choices[0].finish_reason
             }
         }
         
