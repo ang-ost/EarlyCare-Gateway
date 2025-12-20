@@ -535,8 +535,17 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                   e.stopPropagation()
                   setIsDragging(false)
                   const files = Array.from(e.dataTransfer.files)
-                  setUploadedFiles(prev => [...prev, ...files])
-                  setToast({ type: 'success', message: `${files.length} file aggiunti`, icon: '✅' })
+                  const pdfFiles = files.filter(file => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'))
+                  const rejectedCount = files.length - pdfFiles.length
+                  
+                  if (pdfFiles.length > 0) {
+                    setUploadedFiles(prev => [...prev, ...pdfFiles])
+                    setToast({ type: 'success', message: `${pdfFiles.length} file PDF aggiunti`, icon: '✅' })
+                  }
+                  
+                  if (rejectedCount > 0) {
+                    setToast({ type: 'warning', message: `${rejectedCount} file ignorati (solo PDF accettati)`, icon: '⚠️' })
+                  }
                 }}
                 onClick={() => document.getElementById('fileUploadInput').click()}
               >
