@@ -858,7 +858,22 @@ def generate_diagnosis():
             
             # Aggiungi info su allegati se presenti
             if clinical_record.get('attachments'):
-                patient_data['allegati'] = [att.get('name', att) for att in clinical_record['attachments']]
+                # Prepara allegati con contenuto base64 per analisi IA
+                import base64
+                decoded_attachments = []
+                for att in clinical_record['attachments']:
+                    if isinstance(att, dict) and 'content' in att:
+                        # Mantieni il contenuto base64 per l'analisi IA
+                        decoded_attachments.append({
+                            'name': att.get('name', 'unknown'),
+                            'type': att.get('type', 'application/octet-stream'),
+                            'size': att.get('size', 0),
+                            'content': att['content']  # Base64 string
+                        })
+                    elif isinstance(att, str):
+                        decoded_attachments.append({'name': att})
+                
+                patient_data['allegati'] = decoded_attachments
         else:
             # Altrimenti usa tutti i record clinici disponibili
             try:

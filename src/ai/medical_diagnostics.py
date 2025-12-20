@@ -106,14 +106,58 @@ Tempi recupero, possibili complicanze.
         raise Exception("Tutti i tentativi falliti")
     
     def _generate_with_gemini(self, patient_data: Dict) -> Dict:
-        """Generate diagnosis using Google Gemini API."""
+        """Generate diagnosis using Google Gemini API with multimodal support."""
         # Format patient data for analysis
         print(f"[AI] Formatting patient data...")
         formatted_data = self._format_patient_data(patient_data)
         print(f"[AI] Patient data formatted, length: {len(formatted_data)} chars")
         
+        # Check for attachments (images, documents)
+        attachments = patient_data.get('allegati', [])
+        has_multimodal_content = False
+        image_parts = []
+        
+        if attachments and isinstance(attachments, list):
+            print(f"[AI] Processing {len(attachments)} attachments...")
+            import base64
+            from PIL import Image
+            import io
+            
+            for att in attachments:
+                if isinstance(att, dict) and 'content' in att and 'type' in att:
+                    file_type = att['type']
+                    file_name = att.get('name', 'unknown')
+                    
+                    # Process images
+                    if file_type.startswith('image/'):
+                        try:
+                            # Decode base64 image
+                            image_data = base64.b64decode(att['content'])
+                            image = Image.open(io.BytesIO(image_data))
+                            
+                            # Convert to RGB if necessary (Gemini requires RGB)
+                            if image.mode != 'RGB':
+                                image = image.convert('RGB')
+                            
+                            image_parts.append({
+                                'name': file_name,
+                                'image': image
+                            })
+                            has_multimodal_content = True
+                            print(f"[AI] Added image: {file_name} ({image.size})")
+                        except Exception as e:
+                            print(f"[AI] Error processing image {file_name}: {e}")
+                    
+                    # TODO: Process PDF documents (extract text)
+                    elif file_type == 'application/pdf':
+                        try:
+                            # For now, just note that PDF is attached
+                            print(f"[AI] PDF attachment detected: {file_name} (text extraction not yet implemented)")
+                        except Exception as e:
+                            print(f"[AI] Error processing PDF {file_name}: {e}")
+        
         # Create the prompt
-        prompt = f"""{self.system_prompt}
+        prompt_text = f"""{self.system_prompt}
 
 DATI CLINICI DEL PAZIENTE:
 
@@ -121,18 +165,42 @@ DATI CLINICI DEL PAZIENTE:
 
 Fornisci ora una valutazione diagnostica completa e strutturata."""
 
+        # Add note about attachments if present
+        if has_multimodal_content:
+            prompt_text += f"\n\nNOTA: Sono presenti {len(image_parts)} immagini allegate. Analizza attentamente le immagini fornite insieme ai dati clinici per una diagnosi più accurata."
+
         print(f"[AI] Calling Gemini API...")
-        # Generate diagnosis using Gemini
-        response = self.model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.3,
-                top_p=0.95,
-                top_k=40,
-                max_output_tokens=2048,
-                candidate_count=1,
+        
+        # Build content parts for multimodal request
+        if has_multimodal_content:
+            # Multimodal request with images
+            content_parts = [prompt_text]
+            for img_part in image_parts:
+                content_parts.append(img_part['image'])
+                content_parts.append(f"\n[Immagine allegata: {img_part['name']}]\n")
+            
+            response = self.model.generate_content(
+                content_parts,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.3,
+                    top_p=0.95,
+                    top_k=40,
+                    max_output_tokens=2048,
+                    candidate_count=1,
+                )
             )
-        )
+        else:
+            # Text-only request
+            response = self.model.generate_content(
+                prompt_text,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.3,
+                    top_p=0.95,
+                    top_k=40,
+                    max_output_tokens=2048,
+                    candidate_count=1,
+                )
+            )
         
         print(f"[AI] Response received from Gemini")
         
@@ -161,6 +229,7 @@ Fornisci ora una valutazione diagnostica completa e strutturata."""
             'metadata': {
                 'analysis_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 'data_points_analyzed': self._count_data_points(patient_data),
+                'attachments_analyzed': len(image_parts) if has_multimodal_content else 0,
                 'finish_reason': str(finish_reason) if finish_reason else 'COMPLETE'
             }
         }
