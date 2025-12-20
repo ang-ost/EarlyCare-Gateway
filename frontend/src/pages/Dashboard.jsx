@@ -43,14 +43,11 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
   })
 
   const [recordFiles, setRecordFiles] = useState([])
-<<<<<<< Updated upstream
   const [uploadedFiles, setUploadedFiles] = useState([])
   const [isDragging, setIsDragging] = useState(false)
-=======
   const [comuniSuggest, setComuniSuggest] = useState([])
   const [showComuniList, setShowComuniList] = useState(false)
   const [calculatedCF, setCalculatedCF] = useState('')
->>>>>>> Stashed changes
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
@@ -401,10 +398,6 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
             <h1 style={{ margin: 0, fontSize: '1.5rem' }}>Medical Access & Vision</h1>
           </div>
           <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', color: '#1e3a8a', fontWeight: '500' }}>
-              <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', background: '#059669' }}></span>
-              Database Connesso
-            </div>
             <div className="user-menu">
               <button className="menu-button" onClick={() => setShowMenu(!showMenu)}>
                 💼 {user?.firstName} {user?.lastName}

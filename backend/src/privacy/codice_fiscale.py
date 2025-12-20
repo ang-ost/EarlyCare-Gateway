@@ -24,8 +24,8 @@ def load_comuni() -> List[Dict]:
         return _COMUNI_DATA
     
     possible_paths = [
-        os.path.join(os.path.dirname(__file__), '..', '..', 'frontend', 'node_modules', 'comuni-json', 'comuni.json'),
-        os.path.join(os.path.dirname(__file__), '..', '..', 'comuni.json'),
+        os.path.join(os.path.dirname(__file__), '..', '..', '..', 'frontend', 'node_modules', 'comuni-json', 'comuni.json'),
+        os.path.join(os.path.dirname(__file__), '..', '..', '..', 'comuni.json'),
         'comuni.json',
     ]
     
@@ -46,17 +46,28 @@ def load_comuni() -> List[Dict]:
 def calculate_codice_fiscale(
     nome: str,
     cognome: str,
-    data_nascita: datetime,
+    data_nascita,  # Can be datetime or string DD/MM/YYYY
     comune_nascita: str,
     sesso: str
 ) -> Optional[str]:
     """Calculate Italian Codice Fiscale (Tax Code)."""
     try:
+        # Convert string to datetime if needed
+        if isinstance(data_nascita, str):
+            # Try DD/MM/YYYY format first
+            if '/' in data_nascita:
+                data_obj = datetime.strptime(data_nascita, '%d/%m/%Y')
+            else:
+                # Assume YYYY-MM-DD
+                data_obj = datetime.strptime(data_nascita, '%Y-%m-%d')
+        else:
+            data_obj = data_nascita
+        
         # Usa la libreria python-codicefiscale se disponibile
         if CODICEFISCALE_LIB_AVAILABLE:
             try:
                 # Formato data: DD/MM/YYYY
-                data_str = f"{data_nascita.day:02d}/{data_nascita.month:02d}/{data_nascita.year}"
+                data_str = f"{data_obj.day:02d}/{data_obj.month:02d}/{data_obj.year}"
                 cf = encode(
                     cognome.upper(),
                     nome.upper(),
@@ -70,7 +81,7 @@ def calculate_codice_fiscale(
                 print(f"DEBUG: Library encoding failed: {e}, falling back to manual")
         
         # Fallback manuale
-        if not all([nome, cognome, data_nascita, comune_nascita, sesso]):
+        if not all([nome, cognome, data_obj, comune_nascita, sesso]):
             return None
         
         def get_consonants(s: str) -> str:
@@ -91,11 +102,11 @@ def calculate_codice_fiscale(
         else:
             nome_code = (nome_consonants + nome_vowels)[:3].ljust(3, 'X')
         
-        yy = str(data_nascita.year)[-2:]
+        yy = str(data_obj.year)[-2:]
         month_codes = 'ABCDEHLMPRST'
-        mm = month_codes[data_nascita.month - 1]
+        mm = month_codes[data_obj.month - 1]
         
-        day = data_nascita.day
+        day = data_obj.day
         if sesso.upper() in ['F', 'FEMALE']:
             gg = str(day + 40).zfill(2)
         else:

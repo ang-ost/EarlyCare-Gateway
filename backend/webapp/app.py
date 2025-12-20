@@ -460,6 +460,48 @@ def create_patient():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/patient/calculate-cf', methods=['POST'])
+def calculate_cf():
+    """Calculate Codice Fiscale in real-time."""
+    data = request.json
+    
+    try:
+        from src.privacy.codice_fiscale import calculate_codice_fiscale
+        
+        # Extract data
+        cognome = data.get('cognome', '')
+        nome = data.get('nome', '')
+        data_nascita = data.get('data_nascita', '')  # Format: YYYY-MM-DD
+        sesso = data.get('sesso', 'M')
+        comune_nascita = data.get('comune_nascita', '')
+        
+        if not all([cognome, nome, data_nascita, sesso, comune_nascita]):
+            missing = [k for k in ['cognome', 'nome', 'data_nascita', 'sesso', 'comune_nascita'] if not data.get(k)]
+            return jsonify({'error': f'Dati incompleti: {", ".join(missing)}'}), 400
+        
+        # Convert date format from YYYY-MM-DD to DD/MM/YYYY for the function
+        date_obj = datetime.strptime(data_nascita, '%Y-%m-%d')
+        date_formatted = date_obj.strftime('%d/%m/%Y')
+        
+        cf = calculate_codice_fiscale(
+            cognome=cognome,
+            nome=nome,
+            data_nascita=date_formatted,
+            sesso=sesso,
+            comune_nascita=comune_nascita
+        )
+        
+        if not cf:
+            return jsonify({'error': 'Impossibile calcolare il codice fiscale'}), 400
+        
+        return jsonify({'codice_fiscale': cf})
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Errore nel calcolo: {str(e)}'}), 500
+
+
 @app.route('/api/patient/<fiscal_code>/records', methods=['GET'])
 @require_login
 def get_patient_records(fiscal_code):
