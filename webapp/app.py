@@ -717,50 +717,112 @@ def upload_folder():
     fiscal_code = request.form.get('fiscal_code')
     
     try:
-        # Create temporary folder for upload
-        temp_folder = app.config['UPLOAD_FOLDER'] / fiscal_code / datetime.now().strftime('%Y%m%d_%H%M%S')
-        temp_folder.mkdir(parents=True, exist_ok=True)
-        
-        # Save all files
-        saved_files = []
-        attachments = []
-        pdf_files = []
-        for file in files:
-            if file.filename:
-                filename = secure_filename(file.filename)
-                filepath = temp_folder / filename
-                file.save(filepath)
-                saved_files.append(str(filepath))
-                attachments.append({
-                    'name': filename,
-                    'path': str(filepath),
-                    'size': filepath.stat().st_size,
-                    'type': file.content_type or 'application/octet-stream'
-                })
-                
-                # Track PDF files for later extraction
-                if filename.lower().endswith('.pdf'):
-                    pdf_files.append(str(filepath))
-        
-        # Check if any PDF files contain exported clinical records
+        # Process PDF files directly from memory without saving to disk
         extracted_records_count = 0
-        for pdf_path in pdf_files:
-            print(f"Checking PDF for clinical records: {pdf_path}")
-            extracted_records = extract_clinical_records_from_pdf(pdf_path)
-            if extracted_records:
-                print(f"✅ Found {len(extracted_records)} clinical records in PDF")
-                # Get current doctor from session
-                doctor_id = session.get('doctor_id')
-                doctor_data = db.find_doctor_by_id(doctor_id) if doctor_id and db_connected else None
+        
+        for file in files:
+            if file.filename and file.filename.lower().endswith('.pdf'):
+                # Read PDF content into memory
+                pdf_content = file.read()
                 
-                # Import each record as a separate clinical record
-                for record in extracted_records:
-                    record['doctor_id'] = doctor_id
-                    record['doctor_name'] = f"{doctor_data.get('nome', '')} {doctor_data.get('cognome', '')}" if doctor_data else 'Importato da PDF'
-                    record['doctor_specialization'] = doctor_data.get('specializzazione', '') if doctor_data else ''
-                    db.add_clinical_record(fiscal_code, record)
-                    extracted_records_count += 1
-                    print(f"✅ Imported record: {record.get('chief_complaint', 'N/A')}")
+                # Create a temporary file object to parse the PDF
+                import io
+                pdf_file = io.BytesIO(pdf_content)
+                
+                # Try to extract clinical records from PDF
+                print(f"Checking PDF for clinical records: {file.filename}")
+                
+                # Extract using PyPDF2 from memory
+                try:
+                    from PyPDF2 import PdfReader
+                    reader = PdfReader(pdf_file)
+                    text = ''
+                    for page in reader.pages:
+                        text += page.extract_text()
+                    
+                    # Check if it's an exported clinical record PDF
+                    if 'Cartella Clinica Elettronica' in text and 'EarlyCare Gateway' in text:
+                        print("DEBUG PDF: This is an exported clinical record PDF")
+                        records = []
+                        
+                        # Split by "Scheda Clinica #" to find individual records
+                        record_pattern = r'Scheda Clinica #(\d+) - ([\d/]+ [\d:]+)'
+                        matches = list(re.finditer(record_pattern, text))
+                        
+                        print(f"DEBUG PDF: Found {len(matches)} schede cliniche")
+                        
+                        for i, match in enumerate(matches):
+                            start_pos = match.start()
+                            end_pos = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+                            record_text = text[start_pos:end_pos]
+                            
+                            # Extract fields using regex
+                            encounter_id_match = re.search(r'ID Incontro:\s*(.+?)(?:\n|Motivo)', record_text)
+                            chief_complaint_match = re.search(r'Motivo Principale:\s*(.+?)(?:\n|Sintomi)', record_text)
+                            symptoms_match = re.search(r'Sintomi:\s*(.+?)(?:\n|Priorit)', record_text)
+                            priority_match = re.search(r'Priorità:\s*(.+?)(?:\n|Pressione|Note|Scheda)', record_text)
+                            
+                            # Extract vital signs
+                            bp_match = re.search(r'Pressione Sanguigna:\s*(.+?)(?:\n|Frequenza)', record_text)
+                            hr_match = re.search(r'Frequenza Cardiaca:\s*(.+?)(?:\n|Temperatura)', record_text)
+                            temp_match = re.search(r'Temperatura:\s*(.+?)°C', record_text)
+                            o2_match = re.search(r'Saturazione O2:\s*(.+?)(?:\n|Frequenza)', record_text)
+                            rr_match = re.search(r'Frequenza Respiratoria:\s*(.+?)(?:\n|Note|Scheda)', record_text)
+                            
+                            # Extract notes
+                            notes_match = re.search(r'Note:\s*(.+?)(?:Scheda Clinica #|Documento generato|\Z)', record_text, re.DOTALL)
+                            
+                            # Parse timestamp
+                            timestamp_str = match.group(2)
+                            try:
+                                timestamp = datetime.strptime(timestamp_str, '%d/%m/%Y %H:%M:%S')
+                            except:
+                                timestamp = datetime.now()
+                            
+                            # Generate unique encounter_id for each import
+                            unique_encounter_id = f'ENC-IMPORTED-{datetime.now().strftime("%Y%m%d%H%M%S")}-{i}'
+                            
+                            record = {
+                                'timestamp': timestamp.isoformat(),
+                                'encounter_id': unique_encounter_id,
+                                'motivo_tipo': 'Importato da PDF',
+                                'motivo': chief_complaint_match.group(1).strip() if chief_complaint_match else 'N/A',
+                                'chief_complaint': chief_complaint_match.group(1).strip() if chief_complaint_match else 'N/A',
+                                'symptoms': symptoms_match.group(1).strip() if symptoms_match else '',
+                                'notes': notes_match.group(1).strip() if notes_match else '',
+                                'priority': priority_match.group(1).strip() if priority_match else 'routine',
+                                'vital_signs': {
+                                    'blood_pressure': bp_match.group(1).strip() if bp_match else '',
+                                    'heart_rate': hr_match.group(1).strip() if hr_match else '',
+                                    'temperature': temp_match.group(1).strip() if temp_match else '',
+                                    'oxygen_saturation': o2_match.group(1).strip() if o2_match else '',
+                                    'respiratory_rate': rr_match.group(1).strip() if rr_match else ''
+                                },
+                                'attachments': [],
+                                'original_encounter_id': encounter_id_match.group(1).strip() if encounter_id_match else 'N/A'
+                            }
+                            
+                            records.append(record)
+                        
+                        if records:
+                            print(f"✅ Found {len(records)} clinical records in PDF")
+                            # Get current doctor from session
+                            doctor_id = session.get('doctor_id')
+                            doctor_data = db.find_doctor_by_id(doctor_id) if doctor_id and db_connected else None
+                            
+                            # Import each record
+                            for record in records:
+                                record['doctor_id'] = doctor_id
+                                record['doctor_name'] = f"{doctor_data.get('nome', '')} {doctor_data.get('cognome', '')}" if doctor_data else 'Importato da PDF'
+                                record['doctor_specialization'] = doctor_data.get('specializzazione', '') if doctor_data else ''
+                                db.add_clinical_record(fiscal_code, record)
+                                extracted_records_count += 1
+                                print(f"✅ Imported record: {record.get('chief_complaint', 'N/A')}")
+                        
+                except Exception as e:
+                    print(f"Error parsing PDF: {e}")
+                    import traceback
+                    traceback.print_exc()
         
         # If we extracted records from PDF, return success message
         if extracted_records_count > 0:
@@ -770,79 +832,7 @@ def upload_folder():
                 'imported_count': extracted_records_count
             })
         
-        # Process folder
-        if processor:
-            results = processor.process_folder(str(temp_folder))
-            
-            # Get current doctor from session
-            doctor_id = session.get('doctor_id')
-            doctor_data = db.find_doctor_by_id(doctor_id) if doctor_id and db_connected else None
-            
-            # Save results if database is connected
-            if db_connected and fiscal_code:
-                # Convert DecisionSupport results to clinical record format
-                top_diagnosis = results.get_top_diagnosis()
-                
-                # Extract file content for notes
-                notes_content = []
-                for filepath in saved_files:
-                    try:
-                        file_path = Path(filepath)
-                        if file_path.suffix.lower() in ['.txt', '.md', '.note']:
-                            with open(filepath, 'r', encoding='utf-8') as f:
-                                notes_content.append(f"=== {file_path.name} ===\n{f.read()}\n")
-                        elif file_path.suffix.lower() == '.pdf':
-                            notes_content.append(f"=== {file_path.name} ===\n[File PDF caricato]\n")
-                    except:
-                        pass
-                
-                # Create clinical record from processing results
-                record = {
-                    'timestamp': datetime.now().isoformat(),
-                    'motivo_tipo': 'Caricamento File',
-                    'motivo': f'File caricati e processati automaticamente ({len(files)} file)',
-                    'tipo_scheda': 'Caricamento File',
-                    'chief_complaint': f'Processamento automatico di {len(files)} file clinici',
-                    'symptoms': '\n'.join(results.clinical_notes) if results.clinical_notes else '',
-                    'diagnosis': top_diagnosis.condition if top_diagnosis else 'In analisi',
-                    'treatment': '\n'.join([f"- {test}" for test in top_diagnosis.recommended_tests]) if top_diagnosis and top_diagnosis.recommended_tests else '',
-                    'notes': '\n'.join(notes_content) if notes_content else f'File processati: {", ".join([Path(f).name for f in saved_files])}',
-                    'vital_signs': {},
-                    'attachments': attachments,
-                    'lab_results': [],
-                    'imaging': [],
-                    'doctor_id': doctor_id,
-                    'doctor_name': f"{doctor_data.get('nome', '')} {doctor_data.get('cognome', '')}" if doctor_data else 'Sistema Automatico',
-                    'doctor_specialization': doctor_data.get('specializzazione', '') if doctor_data else 'AI Processing',
-                    # Additional metadata
-                    'ai_processing': {
-                        'model_used': results.models_used,
-                        'processing_time_ms': results.processing_time_ms,
-                        'confidence': top_diagnosis.confidence_score if top_diagnosis else 0.0,
-                        'alerts': results.alerts,
-                        'warnings': results.warnings,
-                        'all_diagnoses': [
-                            {
-                                'condition': d.condition,
-                                'confidence': d.confidence_score,
-                                'evidence': d.evidence
-                            } for d in results.diagnoses
-                        ]
-                    }
-                }
-                
-                db.add_clinical_record(fiscal_code, record)
-                
-                return jsonify({
-                    'success': True, 
-                    'message': f'{len(files)} file processati e convertiti in scheda clinica',
-                    'diagnosis': top_diagnosis.condition if top_diagnosis else None,
-                    'confidence': top_diagnosis.confidence_score if top_diagnosis else 0.0
-                })
-            else:
-                return jsonify({'error': 'Database non connesso'}), 500
-        else:
-            return jsonify({'error': 'Processore non inizializzato'}), 500
+        return jsonify({'error': 'Nessuna scheda clinica trovata nel PDF'}), 400
             
     except Exception as e:
         import traceback
