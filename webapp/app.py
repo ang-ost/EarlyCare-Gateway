@@ -303,25 +303,26 @@ def check_auth():
 
 @app.route('/')
 def index():
-    """Home page - redirect to login if not authenticated."""
-    if 'doctor_id' not in session:
-        return render_template('login.html')
-    return render_template('index.html', db_connected=db_connected)
+    """API root - return status."""
+    return jsonify({
+        'service': 'EarlyCare Gateway API',
+        'version': '1.0.0',
+        'status': 'running',
+        'db_connected': db_connected
+    })
 
 
-@app.route('/profile')
+@app.route('/api/profile')
+@require_login
 def profile():
-    """Doctor profile page."""
-    if 'doctor_id' not in session:
-        return render_template('login.html')
-    
+    """Get doctor profile."""
     try:
         doctor_data = db.find_doctor_by_id(session['doctor_id'])
         if not doctor_data:
             session.clear()
-            return render_template('login.html')
+            return jsonify({'error': 'Medico non trovato'}), 404
         
-        return render_template('profile.html', doctor=doctor_data, db_connected=db_connected)
+        return jsonify({'doctor': doctor_data, 'db_connected': db_connected}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -939,6 +940,15 @@ def generate_diagnosis():
         print(f"Error in generate_diagnosis: {e}")
         import traceback
         traceback.print_exc()
+        
+        # Check for quota exceeded error
+        error_message = str(e)
+        if 'quota' in error_message.lower() or '429' in error_message or 'ResourceExhausted' in error_message:
+            return jsonify({
+                'error': 'Quota API superata',
+                'message': 'Il servizio di diagnostica AI ha raggiunto il limite giornaliero di richieste. Riprova domani o contatta l\'amministratore per aumentare la quota.'
+            }), 429
+        
         return jsonify({'error': str(e)}), 500
 
 
@@ -1063,10 +1073,29 @@ Fornisci una risposta appropriata seguendo rigorosamente le regole sopra."""
         print(f"Error in chatbot_ask: {e}")
         import traceback
         traceback.print_exc()
+        
+        # Check for quota exceeded error
+        error_message = str(e)
+        if 'quota' in error_message.lower() or '429' in error_message:
+            return jsonify({
+                'success': False,
+                'response': 'Il servizio di chatbot ha raggiunto il limite giornaliero di richieste. Riprova domani o contatta l\'amministratore per aumentare la quota API.'
+            }), 429
+        
         return jsonify({
             'success': False,
             'response': 'Mi dispiace, si è verificato un errore tecnico. Riprova più tardi.'
         }), 500
+
+
+@app.route('/health')
+def health():
+    """Health check endpoint for Docker."""
+    return jsonify({
+        'status': 'healthy',
+        'db_connected': db_connected,
+        'ai_available': ai_diagnostics is not None
+    }), 200
 
 
 if __name__ == '__main__':

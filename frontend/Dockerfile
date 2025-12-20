@@ -22,8 +22,8 @@ FROM nginx:alpine
 # Copia i file buildati da stage precedente
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Copia configurazione Nginx personalizzata (se necessaria)
-# COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copia configurazione Nginx personalizzata
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Espone la porta 80
 EXPOSE 80
