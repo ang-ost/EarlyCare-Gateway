@@ -24,6 +24,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
     data_nascita: '',
     data_decesso: '',
     comune_nascita: '',
+    codice_istat_comune: '',
     sesso: 'M',
     codice_fiscale: '',
     allergie: '',
@@ -47,6 +48,119 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
     onLogout()
+  }
+
+  // Calcolo automatico codice fiscale - Algoritmo italiano standard
+  const calculateCodiceFiscale = (nome, cognome, dataNascita, codicISTAT, sesso) => {
+    if (!nome || !cognome || !dataNascita || !codicISTAT || !sesso) return ''
+
+    try {
+      // Funzione per estrarre consonanti
+      const getConsonants = (str) => {
+        return str.toUpperCase().replace(/[AEIOU]/g, '')
+      }
+
+      // Funzione per estrarre vocali
+      const getVowels = (str) => {
+        return str.toUpperCase().replace(/[^AEIOU]/g, '')
+      }
+
+      // COGNOME: prime 3 consonanti, se meno aggiungere vocali, se ancora meno aggiungere X
+      const cognomeConsonants = getConsonants(cognome)
+      const cognomeVowels = getVowels(cognome)
+      let cognomeCode = (cognomeConsonants + cognomeVowels).slice(0, 3).padEnd(3, 'X')
+
+      // NOME: 1° consonante, 3° consonante, 4° consonante
+      // Se ha meno di 4 consonanti, prendere il 1°, il 2° e il 3°
+      const nomeConsonants = getConsonants(nome)
+      const nomeVowels = getVowels(nome)
+      let nomeCode = ''
+      
+      if (nomeConsonants.length >= 4) {
+        nomeCode = nomeConsonants[0] + nomeConsonants[2] + nomeConsonants[3]
+      } else {
+        nomeCode = (nomeConsonants + nomeVowels).slice(0, 3).padEnd(3, 'X')
+      }
+
+      // DATA NASCITA: YY + MM + GG (con MM codificato e GG +40 se femmina)
+      const [year, month, day] = dataNascita.split('-')
+      const yy = year.slice(-2)
+      
+      const monthCodes = ['A', 'B', 'C', 'D', 'E', 'H', 'L', 'M', 'P', 'R', 'S', 'T']
+      const monthNum = parseInt(month)
+      if (monthNum < 1 || monthNum > 12) return ''
+      const mm = monthCodes[monthNum - 1]
+      
+      const dayNum = parseInt(day)
+      const gg = sesso === 'F' ? (dayNum + 40).toString().padStart(2, '0') : day.padStart(2, '0')
+
+      // COMUNE: codice ISTAT (4 caratteri fornito dall'utente)
+      const comuneCode = codicISTAT.toUpperCase().trim()
+      if (comuneCode.length !== 4) return ''
+
+      // NUMERO PROGRESSIVO: sempre '00' per questa versione semplificata
+      const progressivo = '00'
+
+      // BASE CF (15 caratteri)
+      const baseCF = cognomeCode + nomeCode + yy + mm + gg + comuneCode + progressivo
+
+      // CARATTERE DI CONTROLLO: algoritmo ufficiale italiano
+      const alfabeto = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+      const numeri = '0123456789'
+      const tavola1 = {
+        '0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
+        'A': 10, 'B': 11, 'C': 12, 'D': 13, 'E': 14, 'F': 15, 'G': 16, 'H': 17, 'I': 18,
+        'J': 19, 'K': 20, 'L': 21, 'M': 22, 'N': 23, 'O': 24, 'P': 25, 'Q': 26, 'R': 27,
+        'S': 28, 'T': 29, 'U': 30, 'V': 31, 'W': 32, 'X': 33, 'Y': 34, 'Z': 35
+      }
+
+      const tavola2 = {
+        0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9,
+        10: 'A', 11: 'B', 12: 'C', 13: 'D', 14: 'E', 15: 'F', 16: 'G', 17: 'H', 18: 'I',
+        19: 'J', 20: 'K', 21: 'L', 22: 'M', 23: 'N', 24: 'O', 25: 'P', 26: 'Q', 27: 'R',
+        28: 'S', 29: 'T', 30: 'U', 31: 'V', 32: 'W', 33: 'X', 34: 'Y', 35: 'Z'
+      }
+
+      const pariDispari = {
+        0: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35],
+        1: [1, 0, 5, 7, 6, 8, 9, 13, 15, 17, 18, 20, 16, 19, 25, 20, 29, 31, 4, 34, 32, 30, 26, 28, 27, 29, 23, 3, 2, 33, 35, 10, 14, 25, 24, 11]
+      }
+
+      let somma = 0
+      for (let i = 0; i < baseCF.length; i++) {
+        const char = baseCF[i]
+        const valoreChar = tavola1[char]
+        const indice = i % 2
+        somma += pariDispari[indice][valoreChar]
+      }
+
+      const resto = somma % 26
+      const controlChar = alfabeto[resto]
+
+      return (baseCF + controlChar).toUpperCase()
+    } catch (error) {
+      console.error('Errore nel calcolo del codice fiscale:', error)
+      return ''
+    }
+  }
+
+  const handleCreateFormChange = (e) => {
+    const { name, value } = e.target
+    const updatedData = { ...createFormData, [name]: value }
+
+    // Calcola automaticamente il codice fiscale se i campi necessari sono compilati
+    if (['nome', 'cognome', 'data_nascita', 'codice_istat_comune', 'sesso'].includes(name)) {
+      const cf = calculateCodiceFiscale(
+        updatedData.nome,
+        updatedData.cognome,
+        updatedData.data_nascita,
+        updatedData.codice_istat_comune,
+        updatedData.sesso
+      )
+      updatedData.codice_fiscale = cf
+    }
+
+    setCreateFormData(updatedData)
   }
 
   const handleExport = async () => {
@@ -257,24 +371,24 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
       <header className="header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: '1.5rem' }}>🏥 Medical Access & Vision</h1>
+            <h1 style={{ margin: 0, fontSize: '1.5rem' }}>Medical Access & Vision</h1>
           </div>
           <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', color: '#667eea', fontWeight: '500' }}>
-              <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', background: '#10b981' }}></span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', color: '#1e3a8a', fontWeight: '500' }}>
+              <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', background: '#059669' }}></span>
               Database Connesso
             </div>
             <div className="user-menu">
               <button className="menu-button" onClick={() => setShowMenu(!showMenu)}>
-                👤 {user?.firstName} {user?.lastName}
+                💼 {user?.firstName} {user?.lastName}
               </button>
               {showMenu && (
                 <div className="dropdown-menu">
                   <a href="#" onClick={(e) => { e.preventDefault(); setShowMenu(false); onNavigate('profile') }}>
-                    👤 Il Mio Profilo
+                    💼 Il Mio Profilo
                   </a>
                   <button onClick={() => { handleLogout(); setShowMenu(false) }}>
-                    🚪 Esci
+                    🔐 Esci
                   </button>
                 </div>
               )}
@@ -285,12 +399,12 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
 
       {/* Navbar */}
       <nav style={{
-        background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+        background: 'linear-gradient(90deg, #1e3a8a 0%, #1e40af 100%)',
         padding: '0.5rem 0',
         display: 'flex',
         gap: '0',
-        borderBottom: '3px solid rgba(102, 126, 234, 0.3)',
-        boxShadow: '0 4px 12px rgba(102, 126, 234, 0.2)'
+        borderBottom: '3px solid rgba(30, 58, 138, 0.3)',
+        boxShadow: '0 4px 12px rgba(30, 58, 138, 0.2)'
       }}>
         <button onClick={() => {
           if (foundPatient) {
@@ -323,7 +437,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
           e.currentTarget.style.background = 'none'
           e.currentTarget.style.transform = 'translateY(0)'
         }}>
-          📦 Export
+          📤 Esporta
         </button>
         <button onClick={() => setShowPatientSearch(true)} style={{
           flex: 1,
@@ -347,7 +461,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
           e.currentTarget.style.background = 'none'
           e.currentTarget.style.transform = 'translateY(0)'
         }}>
-          🔍 Cerca Paziente
+          🔎 Ricerca Paziente
         </button>
         <button onClick={() => setShowPatientForm(true)} style={{
           flex: 1,
@@ -371,7 +485,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
           e.currentTarget.style.background = 'none'
           e.currentTarget.style.transform = 'translateY(0)'
         }}>
-          👥 Nuovo Paziente
+          🆕 Nuovo Paziente
         </button>
         <button onClick={() => {
           if (foundPatient) {
@@ -404,7 +518,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
           e.currentTarget.style.background = 'none'
           e.currentTarget.style.transform = 'translateY(0)'
         }}>
-          📋 Aggiungi Scheda
+          📄 Nuova Scheda
         </button>
       </nav>
 
@@ -414,11 +528,11 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
           
           {/* Left Panel */}
           <div className="card">
-            <h3 style={{ marginTop: 0, color: '#667eea' }}>📁 Cartella Clinica</h3>
+            <h3 style={{ marginTop: 0, color: '#1e3a8a' }}>📋 Cartella Clinica</h3>
 
             {/* Patient Info Section */}
             <div style={{ marginBottom: '2rem', paddingBottom: '1.5rem', borderBottom: '1px solid #e5e7eb' }}>
-              <h4 style={{ marginBottom: '1rem' }}>👤 Informazioni Paziente</h4>
+              <h4 style={{ marginBottom: '1rem' }}>Informazioni Paziente</h4>
               {foundPatient ? (
                 <div style={{ background: '#f3f4f6', padding: '1rem', borderRadius: '0.5rem' }}>
                   <p><strong>{foundPatient.nome} {foundPatient.cognome}</strong></p>
@@ -430,33 +544,33 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                     </p>
                   )}
                   {foundPatient.malattie_permanenti && foundPatient.malattie_permanenti.length > 0 && (
-                    <p style={{ color: '#ef4444', fontSize: '0.85rem' }}>
+                    <p style={{ color: '#dc2626', fontSize: '0.85rem' }}>
                       ⚠️ Malattie: {foundPatient.malattie_permanenti.join(', ')}
                     </p>
                   )}
                 </div>
               ) : (
-                <p style={{ color: '#667eea', fontStyle: 'italic' }}>Nessun paziente selezionato</p>
+                <p style={{ color: '#1e3a8a', fontStyle: 'italic' }}>Nessun paziente selezionato</p>
               )}
             </div>
 
             {/* Patient List Section - if multiple homonyms */}
             {/* File Upload Section */}
             <div>
-              <h4 style={{ marginBottom: '1rem' }}>📤 Carica File Clinici</h4>
+              <h4 style={{ marginBottom: '1rem' }}>Upload File Clinici</h4>
               <div style={{
-                border: '2px dashed #667eea',
+                border: '2px dashed #1e3a8a',
                 borderRadius: '0.5rem',
                 padding: '2rem',
                 textAlign: 'center',
-                color: '#667eea',
+                color: '#1e3a8a',
                 cursor: 'pointer',
                 transition: 'all 0.3s'
-              }} onMouseEnter={(e) => e.currentTarget.style.background = '#f0f4ff'} onMouseLeave={(e) => e.currentTarget.style.background = ''}>
-                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>☁️</div>
+              }} onMouseEnter={(e) => e.currentTarget.style.background = '#f0f9ff'} onMouseLeave={(e) => e.currentTarget.style.background = ''}>
+                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>☁</div>
                 <p>Trascina file qui o clicca per selezionare</p>
                 <button type="button" className="btn btn-secondary" style={{ marginTop: '0.5rem' }}>
-                  📁 Seleziona File
+                  Seleziona File
                 </button>
               </div>
             </div>
@@ -465,28 +579,28 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
           {/* Right Panel */}
           <div className="card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', gap: '1rem' }}>
-              <h3 style={{ margin: 0, color: '#667eea' }}>📋 Schede Cliniche</h3>
+              <h3 style={{ margin: 0, color: '#1e3a8a' }}>🩺 Schede Cliniche</h3>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 {selectedRecord !== null && (
                   <button
                     className="btn btn-primary"
                     onClick={() => setShowDiagnosisModal(true)}
                     style={{
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      background: 'linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%)',
                       border: 'none',
                       padding: '0.5rem 1rem',
                       fontSize: '0.9rem',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.5rem',
-                      boxShadow: '0 4px 6px rgba(102, 126, 234, 0.3)'
+                      boxShadow: '0 4px 6px rgba(30, 58, 138, 0.3)'
                     }}
                   >
-                    🧠 Diagnosi AI
+                    💉 Diagnosi AI
                   </button>
                 )}
                 <span style={{
-                  background: '#667eea',
+                  background: '#1e3a8a',
                   color: 'white',
                   padding: '0.25rem 0.75rem',
                   borderRadius: '9999px',
@@ -515,12 +629,12 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                     }}
                     style={{
                       padding: '1rem',
-                      border: selectedRecord === idx ? '3px solid #667eea' : '1px solid #e5e7eb',
-                      borderRadius: '0.5rem',
-                      background: selectedRecord === idx ? 'linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%)' : (expandedRecord === idx ? '#f0f4ff' : 'white'),
-                      cursor: 'pointer',
-                      transition: 'all 0.3s',
-                      boxShadow: selectedRecord === idx ? '0 4px 12px rgba(102, 126, 234, 0.2)' : 'none',
+                        border: selectedRecord === idx ? '3px solid #1e3a8a' : '1px solid #e5e7eb',
+                        borderRadius: '0.5rem',
+                        background: selectedRecord === idx ? 'linear-gradient(135deg, #f0f9ff 0%, #f8fafc 100%)' : (expandedRecord === idx ? '#f0f9ff' : 'white'),
+                        cursor: 'pointer',
+                        transition: 'all 0.3s',
+                        boxShadow: selectedRecord === idx ? '0 4px 12px rgba(30, 58, 138, 0.2)' : 'none',
                       position: 'relative'
                     }}
                   >
@@ -529,7 +643,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                         position: 'absolute',
                         top: '0.5rem',
                         right: '0.5rem',
-                        background: '#667eea',
+                        background: '#1e3a8a',
                         color: 'white',
                         padding: '0.25rem 0.5rem',
                         borderRadius: '0.25rem',
@@ -539,7 +653,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                         alignItems: 'center',
                         gap: '0.25rem'
                       }}>
-                        ✓ Selezionata
+                        ✅ Selezionata
                       </div>
                     )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
@@ -553,12 +667,12 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                             {record.motivo || record.chief_complaint}
                           </p>
                         )}
-                        <p style={{ fontSize: '0.85rem', color: '#667eea', margin: '0.25rem 0 0 0' }}>
-                          📅 {new Date(record.timestamp).toLocaleDateString('it-IT')} {new Date(record.timestamp).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                        <p style={{ fontSize: '0.85rem', color: '#1e3a8a', margin: '0.25rem 0 0 0' }}>
+                          {new Date(record.timestamp).toLocaleDateString('it-IT')} {new Date(record.timestamp).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
                         </p>
                         {record.doctor_name && (
-                          <p style={{ fontSize: '0.75rem', color: '#667eea', margin: '0.25rem 0 0 0', fontWeight: '500' }}>
-                            👨‍⚕️ Dr. {record.doctor_name}
+                          <p style={{ fontSize: '0.75rem', color: '#1e3a8a', margin: '0.25rem 0 0 0', fontWeight: '500' }}>
+                            Dr. {record.doctor_name}
                           </p>
                         )}
                       </div>
@@ -571,32 +685,32 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                       <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb', fontSize: '0.9rem' }}>
                         {record.symptoms && (
                           <div style={{ marginBottom: '1rem' }}>
-                            <p style={{ fontWeight: '600', color: '#667eea', marginBottom: '0.25rem' }}>🩺 Sintomi:</p>
+                            <p style={{ fontWeight: '600', color: '#1e3a8a', marginBottom: '0.25rem' }}>Sintomi:</p>
                             <p style={{ margin: 0, lineHeight: '1.6' }}>{record.symptoms}</p>
                           </div>
                         )}
                         
                         {record.vital_signs && Object.keys(record.vital_signs).length > 0 && (
                           <div style={{ marginBottom: '1rem' }}>
-                            <p style={{ fontWeight: '600', color: '#667eea', marginBottom: '0.5rem' }}>💓 Parametri Vitali:</p>
+                            <p style={{ fontWeight: '600', color: '#1e3a8a', marginBottom: '0.5rem' }}>Parametri Vitali:</p>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.85rem' }}>
-                              {record.vital_signs.blood_pressure && <p style={{ margin: 0 }}>🩸 Pressione: {record.vital_signs.blood_pressure}</p>}
-                              {record.vital_signs.heart_rate && <p style={{ margin: 0 }}>❤️ FC: {record.vital_signs.heart_rate}</p>}
-                              {record.vital_signs.temperature && <p style={{ margin: 0 }}>🌡️ Temp: {record.vital_signs.temperature}</p>}
-                              {record.vital_signs.oxygen_saturation && <p style={{ margin: 0 }}>💨 SpO2: {record.vital_signs.oxygen_saturation}</p>}
-                              {record.vital_signs.respiratory_rate && <p style={{ margin: 0 }}>🫁 FR: {record.vital_signs.respiratory_rate}</p>}
+                              {record.vital_signs.blood_pressure && <p style={{ margin: 0 }}>Pressione: {record.vital_signs.blood_pressure}</p>}
+                              {record.vital_signs.heart_rate && <p style={{ margin: 0 }}>FC: {record.vital_signs.heart_rate}</p>}
+                              {record.vital_signs.temperature && <p style={{ margin: 0 }}>Temp: {record.vital_signs.temperature}</p>}
+                              {record.vital_signs.oxygen_saturation && <p style={{ margin: 0 }}>SpO2: {record.vital_signs.oxygen_saturation}</p>}
+                              {record.vital_signs.respiratory_rate && <p style={{ margin: 0 }}>FR: {record.vital_signs.respiratory_rate}</p>}
                             </div>
                           </div>
                         )}
 
                         {record.attachments && record.attachments.length > 0 && (
                           <div style={{ marginBottom: '1rem' }}>
-                            <p style={{ fontWeight: '600', color: '#667eea', marginBottom: '0.5rem' }}>📎 Allegati:</p>
+                            <p style={{ fontWeight: '600', color: '#1e3a8a', marginBottom: '0.5rem' }}>Allegati:</p>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                               {record.attachments.map((file, fileIdx) => (
                                 <div key={fileIdx} style={{
                                   padding: '0.25rem 0.75rem',
-                                  background: '#f0f4ff',
+                                  background: '#f0f9ff',
                                   borderRadius: '0.25rem',
                                   fontSize: '0.85rem',
                                   display: 'flex',
@@ -613,7 +727,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
 
                         {record.notes && (
                           <div>
-                            <p style={{ fontWeight: '600', color: '#667eea', marginBottom: '0.25rem' }}>📝 Note del Medico:</p>
+                            <p style={{ fontWeight: '600', color: '#1e3a8a', marginBottom: '0.25rem' }}>🖊️ Note del Medico:</p>
                             <p style={{ margin: 0, padding: '0.5rem', background: '#f9fafb', borderRadius: '0.25rem', fontFamily: 'monospace', fontSize: '0.85rem', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
                               {record.notes}
                             </p>
@@ -622,14 +736,14 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
 
                         {record.diagnosis && (
                           <div style={{ marginTop: '1rem' }}>
-                            <p style={{ fontWeight: '600', color: '#667eea', marginBottom: '0.25rem' }}>🔬 Diagnosi:</p>
+                            <p style={{ fontWeight: '600', color: '#1e3a8a', marginBottom: '0.25rem' }}>Diagnosi:</p>
                             <p style={{ margin: 0 }}>{record.diagnosis}</p>
                           </div>
                         )}
                         
                         {record.treatment && (
                           <div style={{ marginTop: '1rem' }}>
-                            <p style={{ fontWeight: '600', color: '#667eea', marginBottom: '0.25rem' }}>💊 Trattamento:</p>
+                            <p style={{ fontWeight: '600', color: '#1e3a8a', marginBottom: '0.25rem' }}>Trattamento:</p>
                             <p style={{ margin: 0 }}>{record.treatment}</p>
                           </div>
                         )}
@@ -639,7 +753,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                 ))}
               </div>
             ) : (
-              <p style={{ color: '#667eea', fontStyle: 'italic' }}>Nessuna scheda clinica disponibile</p>
+              <p style={{ color: '#1e3a8a', fontStyle: 'italic' }}>Nessuna scheda clinica disponibile</p>
             )}
           </div>
         </div>
@@ -649,7 +763,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
       {showPatientSearch && (
         <div className="modal-overlay" onClick={() => setShowPatientSearch(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>🔍 Ricerca Paziente</h3>
+            <h3>🔎 Ricerca Paziente</h3>
             {error && <div className="alert alert-danger">{error}</div>}
             <form onSubmit={handlePatientSearch}>
               <div className="form-group">
@@ -679,48 +793,55 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
       {showPatientForm && (
         <div className="modal-overlay" onClick={() => setShowPatientForm(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h3>👥 Nuovo Paziente</h3>
+            <h3>🆕 Nuovo Paziente</h3>
             {error && <div className="alert alert-danger">{error}</div>}
             
             <form onSubmit={handleCreatePatient}>
-              <h4 style={{ color: '#667eea', marginTop: '1.5rem', marginBottom: '1rem' }}>Dati Anagrafici</h4>
+              <h4 style={{ color: '#1e3a8a', marginTop: '1.5rem', marginBottom: '1rem' }}>Dati Anagrafici</h4>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
                   <label>Nome *</label>
-                  <input type="text" value={createFormData.nome} onChange={(e) => setCreateFormData({...createFormData, nome: e.target.value})} required />
+                  <input type="text" value={createFormData.nome} onChange={handleCreateFormChange} name="nome" required />
                 </div>
                 <div className="form-group">
                   <label>Cognome *</label>
-                  <input type="text" value={createFormData.cognome} onChange={(e) => setCreateFormData({...createFormData, cognome: e.target.value})} required />
+                  <input type="text" value={createFormData.cognome} onChange={handleCreateFormChange} name="cognome" required />
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
                   <label>Data Nascita *</label>
-                  <input type="date" value={createFormData.data_nascita} onChange={(e) => setCreateFormData({...createFormData, data_nascita: e.target.value})} required />
+                  <input type="date" value={createFormData.data_nascita} onChange={handleCreateFormChange} name="data_nascita" required />
                 </div>
                 <div className="form-group">
                   <label>Data Decesso</label>
-                  <input type="date" value={createFormData.data_decesso} onChange={(e) => setCreateFormData({...createFormData, data_decesso: e.target.value})} />
+                  <input type="date" value={createFormData.data_decesso} onChange={handleCreateFormChange} name="data_decesso" />
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
                   <label>Comune Nascita *</label>
-                  <input type="text" value={createFormData.comune_nascita} onChange={(e) => setCreateFormData({...createFormData, comune_nascita: e.target.value})} required />
+                  <input type="text" value={createFormData.comune_nascita} onChange={handleCreateFormChange} name="comune_nascita" required />
                 </div>
+                <div className="form-group">
+                  <label>Codice ISTAT Comune * <span style={{ fontSize: '0.85rem', color: '#666' }}>(es: H501 per Roma, B191 per Brindisi)</span></label>
+                  <input type="text" value={createFormData.codice_istat_comune} onChange={handleCreateFormChange} name="codice_istat_comune" placeholder="A123" maxLength="4" required />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
                 <div className="form-group">
                   <label>Sesso *</label>
                   <div style={{ display: 'flex', gap: '1.5rem', paddingTop: '0.5rem' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', margin: 0 }}>
-                      <input type="radio" name="sesso" value="M" checked={createFormData.sesso === 'M'} onChange={(e) => setCreateFormData({...createFormData, sesso: e.target.value})} required />
+                      <input type="radio" name="sesso" value="M" checked={createFormData.sesso === 'M'} onChange={handleCreateFormChange} required />
                       <span>Maschio</span>
                     </label>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', margin: 0 }}>
-                      <input type="radio" name="sesso" value="F" checked={createFormData.sesso === 'F'} onChange={(e) => setCreateFormData({...createFormData, sesso: e.target.value})} required />
+                      <input type="radio" name="sesso" value="F" checked={createFormData.sesso === 'F'} onChange={handleCreateFormChange} required />
                       <span>Femmina</span>
                     </label>
                   </div>
@@ -729,10 +850,10 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
 
               <div className="form-group">
                 <label>Codice Fiscale *</label>
-                <input type="text" value={createFormData.codice_fiscale} onChange={(e) => setCreateFormData({...createFormData, codice_fiscale: e.target.value.toUpperCase()})} placeholder="RSSMRA90A01H501Z" maxLength="16" required />
+                <input type="text" value={createFormData.codice_fiscale} readOnly placeholder="Calcolato automaticamente" maxLength="16" />
               </div>
 
-              <h4 style={{ color: '#667eea', marginTop: '1.5rem', marginBottom: '1rem', borderTop: '1px solid #e5e7eb', paddingTop: '1.5rem' }}>Informazioni Cliniche</h4>
+              <h4 style={{ color: '#1e3a8a', marginTop: '1.5rem', marginBottom: '1rem', borderTop: '1px solid #e5e7eb', paddingTop: '1.5rem' }}>Informazioni Cliniche</h4>
 
               <div className="form-group">
                 <label>Allergie</label>
@@ -761,15 +882,15 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
       {showAddRecordForm && foundPatient && (
         <div className="modal-overlay" onClick={() => setShowAddRecordForm(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h3>📋 Aggiungi Scheda Clinica</h3>
+            <h3>📄 Aggiungi Scheda Clinica</h3>
             <p style={{ color: '#6b7280', marginBottom: '1rem' }}>Paziente: <strong>{foundPatient.nome} {foundPatient.cognome}</strong></p>
             {error && <div className="alert alert-danger">{error}</div>}
             
             <form onSubmit={handleAddRecord}>
               <div className="form-group">
                 <select value={recordFormData.motivo_tipo} onChange={(e) => setRecordFormData({...recordFormData, motivo_tipo: e.target.value})} required style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', borderRadius: '8px', border: '2px solid #e5e7eb' }}>
-                  <option value="Visita">🏥 Visita</option>
-                  <option value="Ricovero">🛏️ Ricovero</option>
+                  <option value="Visita">Visita</option>
+                  <option value="Ricovero">Ricovero</option>
                 </select>
               </div>
 
@@ -784,7 +905,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                 ></textarea>
               </div>
 
-              <h4 style={{ color: '#667eea', marginTop: '1.5rem', marginBottom: '1rem' }}>💓 Parametri Vitali</h4>
+              <h4 style={{ color: '#1e3a8a', marginTop: '1.5rem', marginBottom: '1rem' }}>Parametri Vitali</h4>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
@@ -835,7 +956,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
               </div>
 
               <div className="form-group" style={{ marginTop: '1.5rem' }}>
-                <label>📎 Allega Documenti</label>
+                <label>Allega Documenti</label>
                 <input 
                   type="file" 
                   multiple
@@ -843,9 +964,9 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                   onChange={(e) => setRecordFiles(Array.from(e.target.files))}
                   style={{
                     padding: '0.5rem',
-                    border: '2px dashed #667eea',
+                    border: '2px dashed #1e3a8a',
                     borderRadius: '0.5rem',
-                    background: '#f8f9ff',
+                    background: '#f0f9ff',
                     cursor: 'pointer',
                     width: '100%'
                   }}
@@ -874,7 +995,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
               </div>
 
               <div className="form-group">
-                <label>📝 Note del Medico</label>
+                <label>Note del Medico</label>
                 <textarea 
                   value={recordFormData.notes} 
                   onChange={(e) => setRecordFormData({...recordFormData, notes: e.target.value})} 

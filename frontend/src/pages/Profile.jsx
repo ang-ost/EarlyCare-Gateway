@@ -55,7 +55,7 @@ export default function Profile({ user, onNavigate, onLogout }) {
         <div className="header-actions">
           <div className="user-menu">
             <button className="menu-button" onClick={() => setShowMenu(!showMenu)}>
-              👤 {user?.firstName} {user?.lastName}
+              💼 {user?.firstName} {user?.lastName}
             </button>
             {showMenu && (
               <div className="dropdown-menu">
@@ -83,13 +83,13 @@ export default function Profile({ user, onNavigate, onLogout }) {
             <div>
               <p><strong>Specializzazione:</strong> {user?.specialization || 'Non specificata'}</p>
               <p><strong>Ospedale:</strong> {user?.hospital || 'Non specificato'}</p>
-              <p><strong>Status:</strong> <span style={{ color: '#10b981' }}>✓ Attivo</span></p>
+              <p><strong>Status:</strong> <span style={{ color: '#059669' }}>✓ Attivo</span></p>
             </div>
           </div>
         </div>
 
         <div className="card">
-          <h3 style={{ color: '#ef4444' }}>Pericolo - Zona</h3>
+          <h3 style={{ color: '#dc2626' }}>Pericolo - Zona</h3>
           <p>L'eliminazione dell'account è irreversibile. Tutti i dati associati verranno cancellati.</p>
           <button 
             className="btn btn-danger"

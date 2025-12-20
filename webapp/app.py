@@ -36,7 +36,8 @@ except ImportError:
 try:
     from src.ai.medical_diagnostics import MedicalDiagnosticsAI
     AI_AVAILABLE = True
-except ImportError:
+except ImportError as e:
+    print(f"Error importing MedicalDiagnosticsAI: {e}")
     AI_AVAILABLE = False
     MedicalDiagnosticsAI = None
 

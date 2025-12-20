@@ -170,13 +170,33 @@ export default function Login({ onLogin }) {
             </div>
             <div className="form-group">
               <label>Specializzazione</label>
-              <input
-                type="text"
+              <select
                 name="specialization"
                 value={formData.specialization}
                 onChange={handleChange}
                 required
-              />
+                style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}
+              >
+                <option value="">-- Seleziona Specializzazione --</option>
+                <option value="Cardiologia">Cardiologia</option>
+                <option value="Chirurgia Generale">Chirurgia Generale</option>
+                <option value="Dermatologia">Dermatologia</option>
+                <option value="Endocrinologia">Endocrinologia</option>
+                <option value="Gastroenterologia">Gastroenterologia</option>
+                <option value="Ginecologia">Ginecologia</option>
+                <option value="Neurologia">Neurologia</option>
+                <option value="Oftalmologia">Oftalmologia</option>
+                <option value="Oncologia">Oncologia</option>
+                <option value="Ortopedia">Ortopedia</option>
+                <option value="Otorinolaringoiatria">Otorinolaringoiatria</option>
+                <option value="Pediatria">Pediatria</option>
+                <option value="Pneumologia">Pneumologia</option>
+                <option value="Psichiatria">Psichiatria</option>
+                <option value="Radiologia">Radiologia</option>
+                <option value="Reumatologia">Reumatologia</option>
+                <option value="Urologia">Urologia</option>
+                <option value="Medicina Interna">Medicina Interna</option>
+              </select>
             </div>
             <div className="form-group">
               <label>Ospedale</label>
@@ -239,10 +259,10 @@ export default function Login({ onLogin }) {
                   alert('ID copiato negli appunti!')
                 }}
               >
-                📋 Copia ID
+                🆔 Copia ID
               </button>
-              <p style={{ fontSize: '0.8rem', color: '#ef4444', fontWeight: 'bold', marginTop: '0.75rem' }}>
-                ⚠️ Salva questo ID, ti servirà per il login!
+              <p style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 'bold', marginTop: '0.75rem' }}>
+                ⓘ Salva questo ID, ti servirà per il login!
               </p>
             </div>
 
