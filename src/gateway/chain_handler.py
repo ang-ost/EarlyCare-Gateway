@@ -130,7 +130,7 @@ class EnrichmentHandler(ChainHandler):
         critical_keywords = ['diabetes', 'hypertension', 'cancer', 'cardiac', 'renal']
         enrichment_data['has_critical_history'] = any(
             any(keyword in condition.lower() for keyword in critical_keywords)
-            for condition in record.patient.medical_history
+            for condition in record.patient.malattie_permanenti
         )
         
         context['enrichment'] = enrichment_data
@@ -163,7 +163,7 @@ class TriageHandler(ChainHandler):
                 triage_factors.append(f"Age factor: {record.patient.age}")
         
         # Medical history complexity
-        if len(record.patient.medical_history) > 3:
+        if len(record.patient.malattie_permanenti) > 3:
             triage_score += 10
             triage_factors.append("Complex medical history")
         

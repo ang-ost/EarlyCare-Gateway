@@ -171,15 +171,24 @@ class DomainStrategy(ModelStrategy):
             'neurology': ['brain', 'neurological', 'seizure', 'stroke', 'headache'],
             'pulmonology': ['lung', 'respiratory', 'breathing', 'pneumonia', 'copd'],
             'oncology': ['cancer', 'tumor', 'malignancy', 'chemotherapy', 'radiation'],
-            'radiology': ['x-ray', 'ct', 'mri', 'imaging', 'scan']
+            'radiology': ['x-ray', 'ct', 'mri', 'imaging', 'scan'],
+            'general': []  # Empty keywords means it matches everything
         }
         return keyword_map.get(self.domain, [])
     
     def can_handle(self, record: PatientRecord, context: Dict[str, Any]) -> bool:
         """Check if record is relevant to this domain."""
+        # General domain accepts everything
+        if self.domain == 'general':
+            return True
+        
+        # If no keywords, accept everything
+        if not self.keywords:
+            return True
+            
         # Check chief complaint
-        if record.patient.chief_complaint:
-            complaint_lower = record.patient.chief_complaint.lower()
+        if record.chief_complaint:
+            complaint_lower = record.chief_complaint.lower()
             if any(keyword in complaint_lower for keyword in self.keywords):
                 return True
         
@@ -190,8 +199,8 @@ class DomainStrategy(ModelStrategy):
                 if any(keyword in text_lower for keyword in self.keywords):
                     return True
         
-        # Check medical history
-        for condition in record.patient.medical_history:
+        # Check medical history (malattie_permanenti)
+        for condition in record.patient.malattie_permanenti:
             condition_lower = condition.lower()
             if any(keyword in condition_lower for keyword in self.keywords):
                 return True

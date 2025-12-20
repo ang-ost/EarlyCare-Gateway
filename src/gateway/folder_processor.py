@@ -35,7 +35,7 @@ class ClinicalFolderProcessor:
         self.gateway = gateway or ClinicalGateway()
         
         # Supported file extensions
-        self.text_extensions = {'.txt', '.md', '.note', '.report'}
+        self.text_extensions = {'.txt', '.md', '.note', '.report', '.pdf'}
         self.signal_extensions = {'.csv', '.json', '.dat'}
         self.image_extensions = {'.dcm', '.png', '.jpg', '.jpeg', '.tif', '.tiff'}
         
@@ -73,7 +73,11 @@ class ClinicalFolderProcessor:
         print(f"\n1️⃣  Creating patient record...")
         patient = Patient(
             patient_id=patient_id,
-            date_of_birth=datetime(1970, 1, 1),
+            nome="Sconosciuto",
+            cognome="Sconosciuto",
+            data_nascita=datetime(1970, 1, 1),
+            comune_nascita="Sconosciuto",
+            codice_fiscale=patient_id,
             gender=Gender.UNKNOWN,
             medical_record_number=patient_id
         )
@@ -181,22 +185,54 @@ class ClinicalFolderProcessor:
         """Load patient information from JSON file."""
         if not info_file.exists():
             # Create default patient if file doesn't exist
-            print("   ⚠️  No patient_info.json found, using default patient")
+            patient_id = f"P-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            print(f"   ⚠️  No patient_info.json found, using default patient: {patient_id}")
+            print(f"   💡 Tip: Create a patient_info.json file with patient details")
             return Patient(
-                patient_id=f"P-{datetime.now().strftime('%Y%m%d%H%M%S')}",
-                date_of_birth=datetime(1970, 1, 1),
+                patient_id=patient_id,
+                nome="Sconosciuto",
+                cognome="Sconosciuto",
+                data_nascita=datetime(1970, 1, 1),
+                comune_nascita="Sconosciuto",
+                codice_fiscale=patient_id,
                 gender=Gender.UNKNOWN,
-                medical_record_number="UNKNOWN"
+                medical_record_number=patient_id
             )
         
-        with open(info_file, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        
-        # Parse date of birth
-        dob_str = data.get('date_of_birth', '1970-01-01')
         try:
-            dob = datetime.strptime(dob_str, '%Y-%m-%d')
-        except ValueError:
+            with open(info_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        except Exception as e:
+            print(f"   ⚠️  Error reading patient_info.json: {e}")
+            print(f"   Using default patient instead")
+            patient_id = f"P-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            return Patient(
+                patient_id=patient_id,
+                nome="Sconosciuto",
+                cognome="Sconosciuto",
+                data_nascita=datetime(1970, 1, 1),
+                comune_nascita="Sconosciuto",
+                codice_fiscale=patient_id,
+                gender=Gender.UNKNOWN,
+                medical_record_number=patient_id
+            )
+        
+        # Parse date of birth with multiple format support
+        dob_str = data.get('date_of_birth') or data.get('data_nascita') or '1970-01-01'
+        try:
+            # Try multiple date formats
+            for fmt in ['%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y', '%Y%m%d']:
+                try:
+                    dob = datetime.strptime(str(dob_str), fmt)
+                    break
+                except ValueError:
+                    continue
+            else:
+                # If none worked, use default
+                print(f"   ⚠️  Could not parse date: {dob_str}, using default")
+                dob = datetime(1970, 1, 1)
+        except Exception as e:
+            print(f"   ⚠️  Error parsing date_of_birth: {e}")
             dob = datetime(1970, 1, 1)
         
         # Parse gender
@@ -209,13 +245,15 @@ class ClinicalFolderProcessor:
         
         return Patient(
             patient_id=data.get('patient_id', 'UNKNOWN'),
-            date_of_birth=dob,
+            nome=data.get('nome', data.get('first_name', 'Sconosciuto')),
+            cognome=data.get('cognome', data.get('last_name', 'Sconosciuto')),
+            data_nascita=dob,
+            comune_nascita=data.get('comune_nascita', data.get('birth_place', 'Sconosciuto')),
+            codice_fiscale=data.get('codice_fiscale', data.get('fiscal_code', 'UNKNOWN')),
+            allergie=data.get('allergie', data.get('allergies', [])),
+            malattie_permanenti=data.get('malattie_permanenti', data.get('medical_history', [])),
             gender=gender,
-            medical_record_number=data.get('medical_record_number', 'UNKNOWN'),
-            chief_complaint=data.get('chief_complaint'),
-            medical_history=data.get('medical_history', []),
-            current_medications=data.get('medications', []),
-            allergies=data.get('allergies', [])
+            medical_record_number=data.get('medical_record_number', 'UNKNOWN')
         )
     
     def _scan_and_load_data(self, folder_path: Path, record: PatientRecord) -> int:
@@ -266,8 +304,30 @@ class ClinicalFolderProcessor:
     def _load_text_file(self, file_path: Path, patient_id: str) -> Optional[TextData]:
         """Load text clinical document."""
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
+            # Handle PDF files
+            if file_path.suffix.lower() == '.pdf':
+                try:
+                    import PyPDF2
+                    content = ""
+                    with open(file_path, 'rb') as f:
+                        pdf_reader = PyPDF2.PdfReader(f)
+                        for page in pdf_reader.pages:
+                            content += page.extract_text() + "\n"
+                except ImportError:
+                    print(f"   ⚠️  PyPDF2 not installed, cannot read PDF: {file_path.name}")
+                    print(f"   💡 Install with: pip install PyPDF2")
+                    return None
+                except Exception as e:
+                    print(f"   ⚠️  Error reading PDF {file_path.name}: {e}")
+                    return None
+            else:
+                # Handle regular text files
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+            
+            if not content.strip():
+                print(f"   ⚠️  File is empty: {file_path.name}")
+                return None
             
             # Determine document type from filename or path
             doc_type = self._infer_document_type(file_path)
