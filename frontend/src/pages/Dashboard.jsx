@@ -33,7 +33,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
 
   const [recordFormData, setRecordFormData] = useState({
     motivo_tipo: 'Visita',
-    motivo: '',
+    motivo: 'Visita di Controllo',
     symptoms: '',
     notes: '',
     blood_pressure: '',
@@ -285,7 +285,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
       setShowAddRecordForm(false)
       setRecordFormData({
         motivo_tipo: 'Visita',
-        motivo: '',
+        motivo: 'Visita di Controllo',
         symptoms: '',
         notes: '',
         blood_pressure: '',
@@ -1068,7 +1068,14 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
             
             <form onSubmit={handleAddRecord}>
               <div className="form-group">
-                <select value={recordFormData.motivo_tipo} onChange={(e) => setRecordFormData({...recordFormData, motivo_tipo: e.target.value})} required style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', borderRadius: '8px', border: '2px solid #e5e7eb' }}>
+                <select value={recordFormData.motivo_tipo} onChange={(e) => {
+                  const tipo = e.target.value
+                  setRecordFormData({
+                    ...recordFormData, 
+                    motivo_tipo: tipo,
+                    motivo: tipo === 'Visita' ? 'Visita di Controllo' : 'Ricovero Ospedaliero'
+                  })
+                }} required style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', borderRadius: '8px', border: '2px solid #e5e7eb' }}>
                   <option value="Visita">🏥 Visita</option>
                   <option value="Ricovero">🛏️ Ricovero</option>
                 </select>
