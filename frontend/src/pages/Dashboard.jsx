@@ -43,6 +43,8 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
   })
 
   const [recordFiles, setRecordFiles] = useState([])
+  const [uploadedFiles, setUploadedFiles] = useState([])
+  const [isDragging, setIsDragging] = useState(false)
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
@@ -444,21 +446,133 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
             {/* File Upload Section */}
             <div>
               <h4 style={{ marginBottom: '1rem' }}>📤 Carica File Clinici</h4>
-              <div style={{
-                border: '2px dashed #667eea',
-                borderRadius: '0.5rem',
-                padding: '2rem',
-                textAlign: 'center',
-                color: '#667eea',
-                cursor: 'pointer',
-                transition: 'all 0.3s'
-              }} onMouseEnter={(e) => e.currentTarget.style.background = '#f0f4ff'} onMouseLeave={(e) => e.currentTarget.style.background = ''}>
-                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>☁️</div>
-                <p>Trascina file qui o clicca per selezionare</p>
-                <button type="button" className="btn btn-secondary" style={{ marginTop: '0.5rem' }}>
+              <div 
+                style={{
+                  border: `2px dashed ${isDragging ? '#764ba2' : '#667eea'}`,
+                  borderRadius: '0.5rem',
+                  padding: '2rem',
+                  textAlign: 'center',
+                  color: '#667eea',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s',
+                  background: isDragging ? '#f0f4ff' : 'transparent'
+                }}
+                onDragEnter={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setIsDragging(true)
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setIsDragging(true)
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setIsDragging(false)
+                }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setIsDragging(false)
+                  const files = Array.from(e.dataTransfer.files)
+                  setUploadedFiles(prev => [...prev, ...files])
+                  setToast({ type: 'success', message: `${files.length} file aggiunti`, icon: '✅' })
+                }}
+                onClick={() => document.getElementById('fileUploadInput').click()}
+              >
+                <input 
+                  id="fileUploadInput"
+                  type="file" 
+                  multiple
+                  accept=".txt,.pdf,.json,.jpg,.jpeg,.png,.dcm"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files)
+                    setUploadedFiles(prev => [...prev, ...files])
+                    setToast({ type: 'success', message: `${files.length} file aggiunti`, icon: '✅' })
+                  }}
+                  style={{ display: 'none' }}
+                />
+                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>{isDragging ? '📥' : '☁️'}</div>
+                <p style={{ margin: '0.5rem 0' }}>
+                  {isDragging ? 'Rilascia i file qui' : 'Trascina file qui o clicca per selezionare'}
+                </p>
+                <button type="button" className="btn btn-secondary" style={{ marginTop: '0.5rem', pointerEvents: 'none' }}>
                   📁 Seleziona File
                 </button>
+                <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '0.75rem' }}>
+                  Formati supportati: TXT, PDF, JSON, JPG, JPEG, PNG, DICOM
+                </p>
               </div>
+              
+              {uploadedFiles.length > 0 && (
+                <div style={{ marginTop: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <p style={{ fontWeight: '600', color: '#667eea' }}>📎 File caricati ({uploadedFiles.length})</p>
+                    <button 
+                      onClick={() => setUploadedFiles([])}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#ef4444',
+                        cursor: 'pointer',
+                        padding: '0.25rem 0.5rem',
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      🗑️ Rimuovi tutti
+                    </button>
+                  </div>
+                  <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '0.5rem',
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                    padding: '0.5rem',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '0.5rem',
+                    background: '#f9fafb'
+                  }}>
+                    {uploadedFiles.map((file, idx) => (
+                      <div key={idx} style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        gap: '0.5rem',
+                        padding: '0.5rem',
+                        fontSize: '0.9rem',
+                        background: 'white',
+                        borderRadius: '0.25rem',
+                        border: '1px solid #e5e7eb'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
+                          <span>📄</span>
+                          <span style={{ color: '#667eea', fontWeight: '500' }}>{file.name}</span>
+                          <span style={{ color: '#9ca3af', fontSize: '0.85rem' }}>({(file.size / 1024).toFixed(1)} KB)</span>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setUploadedFiles(prev => prev.filter((_, i) => i !== idx))
+                          }}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#ef4444',
+                            cursor: 'pointer',
+                            padding: '0.25rem',
+                            fontSize: '1rem'
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
