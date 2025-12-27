@@ -170,30 +170,6 @@ Generato da EarlyCare Gateway - ${new Date().toISOString()}
               </div>
             )}
 
-            <div style={{ 
-              padding: '1rem', 
-              background: '#f9fafb', 
-              borderRadius: '8px', 
-              fontSize: '0.9rem',
-              marginBottom: '1.5rem'
-            }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-                <div>
-                  <strong>Modello AI:</strong>{' '}
-                  <span>{diagnosis.metadata?.model || 'gemini-3-flash-preview'}</span>
-                </div>
-                <div>
-                  <strong>Punti dati analizzati:</strong>{' '}
-                  <span>{diagnosis.metadata?.data_points_analyzed || 'N/A'}</span>
-                </div>
-                {diagnosis.metadata?.finish_reason && diagnosis.metadata.finish_reason !== 'COMPLETE' && (
-                  <div style={{ gridColumn: '1 / -1', color: '#6b7280' }}>
-                    <strong>Status:</strong> {diagnosis.metadata.finish_reason}
-                  </div>
-                )}
-              </div>
-            </div>
-
             <div className="alert" style={{ 
               background: '#fef3c7', 
               border: '1px solid #fbbf24', 

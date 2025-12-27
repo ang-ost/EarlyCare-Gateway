@@ -1160,7 +1160,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                   marginTop: '1.5rem',
                   marginBottom: '1.5rem'
                 }}>
-                  <p style={{ margin: 0, fontSize: '0.9rem', color: '#6b7280', marginBottom: '0.5rem' }}>📋 Codice Fiscale (anteprima)</p>
+                  <p style={{ margin: 0, fontSize: '0.9rem', color: '#6b7280', marginBottom: '0.5rem' }}>📋 Codice Fiscale</p>
                   <p style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold', color: '#1e3a8a', fontFamily: 'monospace' }}>{calculatedCF}</p>
                 </div>
               )}

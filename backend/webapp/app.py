@@ -572,6 +572,7 @@ def create_patient():
 
 
 @app.route('/api/patient/calculate-cf', methods=['POST'])
+@require_login
 def calculate_cf():
     """Calculate Codice Fiscale in real-time."""
     data = request.json
