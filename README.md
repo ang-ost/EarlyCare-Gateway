@@ -579,7 +579,7 @@ OPENAI_API_KEY=your_openai_api_key_here
 
 ### 📊 Model Comparison
 
-| Aspect | Google Gemini 2.5 Flash | OpenAI GPT-4o-mini |
+| Aspect | gemini-3-flash-preview | OpenAI GPT-4o-mini |
 |---------|-------------------------|-------------------|
 | **Cost** | Free (with limits) | ~$0.15/$0.60 per 1M tokens |
 | **Speed** | Very fast | Fast |

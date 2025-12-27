@@ -1450,7 +1450,7 @@ def diagnostics_status():
     """Check if AI diagnostics service is available."""
     return jsonify({
         'available': ai_diagnostics is not None,
-        'model': 'gemini-2.5-flash' if ai_diagnostics else None
+        'model': 'gemini-3-flash-preview' if ai_diagnostics else None
     }), 200
 
 

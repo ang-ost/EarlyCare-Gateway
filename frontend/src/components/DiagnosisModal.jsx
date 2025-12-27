@@ -52,7 +52,7 @@ DIAGNOSI MEDICA AI
 Paziente: ${patient.nome} ${patient.cognome}
 Codice Fiscale: ${patient.codice_fiscale}
 Data Analisi: ${new Date(diagnosis.timestamp).toLocaleString('it-IT')}
-Modello AI: ${diagnosis.metadata?.model || 'gemini-2.5-flash'}
+Modello AI: ${diagnosis.metadata?.model || 'gemini-3-flash-preview'}
 Punti Dati Analizzati: ${diagnosis.metadata?.data_points_analyzed || 'N/A'}
 
 ================================================================================
@@ -180,7 +180,7 @@ Generato da EarlyCare Gateway - ${new Date().toISOString()}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
                 <div>
                   <strong>Modello AI:</strong>{' '}
-                  <span>{diagnosis.metadata?.model || 'gemini-2.5-flash'}</span>
+                  <span>{diagnosis.metadata?.model || 'gemini-3-flash-preview'}</span>
                 </div>
                 <div>
                   <strong>Punti dati analizzati:</strong>{' '}
