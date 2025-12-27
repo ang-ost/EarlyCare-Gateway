@@ -569,11 +569,6 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                   {foundPatient.age && (
                     <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: '0.25rem 0' }}>Età: {foundPatient.age} anni</p>
                   )}
-                  {foundPatient.allergie && foundPatient.allergie.length > 0 && (
-                    <p style={{ color: '#ef4444', fontSize: '0.85rem', marginTop: '0.5rem' }}>
-                      Allergie: {foundPatient.allergie.join(', ')}
-                    </p>
-                  )}
                   {foundPatient.malattie_permanenti && foundPatient.malattie_permanenti.length > 0 && (
                     <p style={{ color: '#dc2626', fontSize: '0.85rem' }}>
                       Malattie: {foundPatient.malattie_permanenti.join(', ')}
@@ -1038,7 +1033,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
       {showPatientSearch && (
         <div className="modal-overlay" onClick={() => setShowPatientSearch(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>🔎 Ricerca Paziente</h3>
+            <h3>Ricerca Paziente</h3>
             {error && <div className="alert alert-danger">{error}</div>}
             <form onSubmit={handlePatientSearch}>
               <div className="form-group">
@@ -1068,7 +1063,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
       {showPatientForm && (
         <div className="modal-overlay" onClick={() => setShowPatientForm(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h3>🆕 Nuovo Paziente</h3>
+            <h3>Nuovo Paziente</h3>
             {error && <div className="alert alert-danger">{error}</div>}
             
             <form onSubmit={handleCreatePatient}>

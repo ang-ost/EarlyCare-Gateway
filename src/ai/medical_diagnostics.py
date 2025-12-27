@@ -28,8 +28,8 @@ class MedicalDiagnosticsAI:
         
         # Configure Gemini
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
-        self.model_name = 'gemini-2.5-flash'
+        self.model = genai.GenerativeModel('gemini-3-flash-preview')
+        self.model_name = 'gemini-3-flash-preview'
         
         # System prompt for medical diagnostics
         self.system_prompt = """Sei un assistente medico AI per diagnostica clinica e supporto decisionale.
