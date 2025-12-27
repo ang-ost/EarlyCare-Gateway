@@ -2,7 +2,8 @@
 EarlyCare Gateway - Flask Web Application
 """
 
-from flask import Flask, render_template, request, jsonify, send_file, session
+from flask import Flask, render_template, request, jsonify, send_file, session, make_response
+from flask_cors import CORS, cross_origin
 from werkzeug.utils import secure_filename
 import os
 from pathlib import Path
@@ -53,6 +54,54 @@ app = Flask(__name__)
 app.secret_key = Config.FLASK_SECRET_KEY
 app.config['UPLOAD_FOLDER'] = Path(__file__).parent / 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = Config.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+
+# Enable CORS for frontend communication
+# Allow multiple origins for development and production
+frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5173')
+allowed_origins = [origin.strip() for origin in frontend_url.split(',')]
+
+# Add localhost for development
+if 'localhost' not in frontend_url and '127.0.0.1' not in frontend_url:
+    allowed_origins.extend(['http://localhost:5173', 'http://127.0.0.1:5173'])
+
+print(f"🌐 CORS allowed origins: {allowed_origins}")
+
+# Configure CORS with more permissive settings
+CORS(app, 
+     resources={
+         r"/api/*": {
+             "origins": allowed_origins,
+             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+             "allow_headers": ["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With"],
+             "expose_headers": ["Content-Type", "Set-Cookie"],
+             "supports_credentials": True,
+             "max_age": 3600
+         }
+     })
+
+# Session configuration for production (cross-domain)
+is_production = os.getenv('RENDER', '').lower() in ['true', '1', 'yes']
+print(f"🔧 Production mode: {is_production}")
+
+app.config['SESSION_COOKIE_SECURE'] = is_production  # HTTPS only in production
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'None' if is_production else 'Lax'  # None for cross-domain
+app.config['SESSION_COOKIE_DOMAIN'] = None  # Allow cross-domain cookies
+app.config['PERMANENT_SESSION_LIFETIME'] = 86400 * 7  # 7 days
+
+print(f"🍪 Cookie config - Secure: {app.config['SESSION_COOKIE_SECURE']}, SameSite: {app.config['SESSION_COOKIE_SAMESITE']}")
+
+# Add after_request handler to ensure CORS headers on all responses
+@app.after_request
+def after_request(response):
+    origin = request.headers.get('Origin')
+    if origin in allowed_origins:
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, Accept, Origin, X-Requested-With'
+        response.headers['Access-Control-Expose-Headers'] = 'Content-Type, Set-Cookie'
+    return response
 
 # Session configuration
 app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS

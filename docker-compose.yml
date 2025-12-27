@@ -34,8 +34,8 @@ services:
       
     volumes:
       - ./cartelle_cliniche:/app/cartelle_cliniche
-      - ./webapp/uploads:/app/webapp/uploads
-      - ./config:/app/config
+      - ./backend/webapp/uploads:/app/webapp/uploads
+      - ./backend/config:/app/config
     networks:
       - earlycare-network
     healthcheck:

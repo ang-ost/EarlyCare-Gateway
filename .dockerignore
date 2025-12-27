@@ -73,6 +73,9 @@ docker-compose.override.yml
 *.temp
 *.bak
 
+# Backup folders
+backup_*/
+
 # Scripts locali
 start_webapp.ps1
 setup_local_mongodb.ps1

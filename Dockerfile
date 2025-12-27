@@ -10,8 +10,8 @@ RUN apt-get update && apt-get install -y \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Copia i file dei requisiti
-COPY requirements.txt .
+# Copia i file dei requisiti dal backend
+COPY backend/requirements.txt .
 
 # Installa le dipendenze Python
 RUN pip install --no-cache-dir -r requirements.txt
@@ -19,11 +19,19 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Installa dipendenze aggiuntive per Flask e MongoDB
 RUN pip install --no-cache-dir \
     flask>=3.0.0 \
+    flask-cors>=4.0.0 \
     pymongo>=4.6.0 \
-    google-generativeai>=0.3.0
+    google-generativeai>=0.3.0 \
+    reportlab>=4.0.0 \
+    PyPDF2>=3.0.0
 
-# Copia il codice sorgente
-COPY . .
+# Copia il codice sorgente dal backend
+COPY backend/src ./src
+COPY backend/webapp ./webapp
+COPY backend/config ./config
+
+# Copia le cartelle necessarie dalla root
+COPY cartelle_cliniche ./cartelle_cliniche
 
 # Crea le directory necessarie
 RUN mkdir -p webapp/uploads/exports cartelle_cliniche/template
