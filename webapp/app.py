@@ -49,20 +49,34 @@ app.config['MAX_CONTENT_LENGTH'] = Config.MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
 # Enable CORS for frontend communication
 # Allow multiple origins for development and production
-allowed_origins = os.getenv('FRONTEND_URL', 'http://localhost:5173').split(',')
+frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5173')
+allowed_origins = [origin.strip() for origin in frontend_url.split(',')]
+
+# Add localhost for development
+if 'localhost' not in frontend_url and '127.0.0.1' not in frontend_url:
+    allowed_origins.extend(['http://localhost:5173', 'http://127.0.0.1:5173'])
+
+print(f"🌐 CORS allowed origins: {allowed_origins}")
+
 CORS(app, 
+     resources={r"/api/*": {"origins": allowed_origins}},
      supports_credentials=True,
-     origins=allowed_origins,
-     allow_headers=['Content-Type', 'Authorization'],
-     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
+     allow_headers=['Content-Type', 'Authorization', 'Accept'],
+     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+     expose_headers=['Content-Type'],
+     max_age=3600)
 
 # Session configuration for production (cross-domain)
-is_production = os.getenv('RENDER', False)
+is_production = os.getenv('RENDER', '').lower() in ['true', '1', 'yes']
+print(f"🔧 Production mode: {is_production}")
+
 app.config['SESSION_COOKIE_SECURE'] = is_production  # HTTPS only in production
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'None' if is_production else 'Lax'  # None for cross-domain
 app.config['SESSION_COOKIE_DOMAIN'] = None  # Allow cross-domain cookies
 app.config['PERMANENT_SESSION_LIFETIME'] = 86400 * 7  # 7 days
+
+print(f"🍪 Cookie config - Secure: {app.config['SESSION_COOKIE_SECURE']}, SameSite: {app.config['SESSION_COOKIE_SAMESITE']}")
 
 # Ensure upload folder exists
 app.config['UPLOAD_FOLDER'].mkdir(exist_ok=True)
@@ -1106,7 +1120,19 @@ def health():
     return jsonify({
         'status': 'healthy',
         'db_connected': db_connected,
-        'ai_available': ai_diagnostics is not None
+        'ai_available': ai_diagnostics is not None,
+        'cors_origins': allowed_origins,
+        'is_production': is_production
+    }), 200
+
+
+@app.route('/api/test-cors', methods=['GET', 'OPTIONS'])
+def test_cors():
+    """Test CORS configuration."""
+    return jsonify({
+        'message': 'CORS is working!',
+        'origin': request.headers.get('Origin'),
+        'allowed_origins': allowed_origins
     }), 200
 
 
