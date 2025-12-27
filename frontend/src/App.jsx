@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { getApiUrl } from './config'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Profile from './pages/Profile'
@@ -15,7 +16,7 @@ export default function App() {
 
   const checkAuth = async () => {
     try {
-      const res = await fetch('/api/auth/check', { credentials: 'include' })
+      const res = await fetch(getApiUrl('/api/auth/check'), { credentials: 'include' })
       if (res.ok) {
         const data = await res.json()
         if (data.authenticated && data.doctor) {

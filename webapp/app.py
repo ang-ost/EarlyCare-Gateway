@@ -3,6 +3,7 @@ EarlyCare Gateway - Flask Web Application
 """
 
 from flask import Flask, render_template, request, jsonify, send_file, session
+from flask_cors import CORS
 from werkzeug.utils import secure_filename
 import os
 from pathlib import Path
@@ -46,10 +47,21 @@ app.secret_key = Config.FLASK_SECRET_KEY
 app.config['UPLOAD_FOLDER'] = Path(__file__).parent / 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = Config.MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
-# Session configuration
-app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
+# Enable CORS for frontend communication
+# Allow multiple origins for development and production
+allowed_origins = os.getenv('FRONTEND_URL', 'http://localhost:5173').split(',')
+CORS(app, 
+     supports_credentials=True,
+     origins=allowed_origins,
+     allow_headers=['Content-Type', 'Authorization'],
+     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
+
+# Session configuration for production (cross-domain)
+is_production = os.getenv('RENDER', False)
+app.config['SESSION_COOKIE_SECURE'] = is_production  # HTTPS only in production
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SAMESITE'] = 'None' if is_production else 'Lax'  # None for cross-domain
+app.config['SESSION_COOKIE_DOMAIN'] = None  # Allow cross-domain cookies
 app.config['PERMANENT_SESSION_LIFETIME'] = 86400 * 7  # 7 days
 
 # Ensure upload folder exists

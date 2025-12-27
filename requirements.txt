@@ -53,6 +53,7 @@ pymongo>=4.6.0  # MongoDB
 # Web Application
 Flask>=3.0.0
 Werkzeug>=3.0.0
+Flask-CORS>=4.0.0  # Enable CORS for frontend communication
 gunicorn>=21.2.0  # Production WSGI server for deployment
 
 # PDF processing

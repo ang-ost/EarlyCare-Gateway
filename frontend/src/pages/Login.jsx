@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { getApiUrl } from '../config'
 
 export default function Login({ onLogin }) {
   const [tab, setTab] = useState('login')
@@ -27,7 +28,7 @@ export default function Login({ onLogin }) {
     setLoading(true)
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(getApiUrl('/api/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -58,7 +59,7 @@ export default function Login({ onLogin }) {
     setLoading(true)
 
     try {
-      const res = await fetch('/api/auth/register', {
+      const res = await fetch(getApiUrl('/api/auth/register'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
