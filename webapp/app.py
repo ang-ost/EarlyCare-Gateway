@@ -2,8 +2,8 @@
 EarlyCare Gateway - Flask Web Application
 """
 
-from flask import Flask, render_template, request, jsonify, send_file, session
-from flask_cors import CORS
+from flask import Flask, render_template, request, jsonify, send_file, session, make_response
+from flask_cors import CORS, cross_origin
 from werkzeug.utils import secure_filename
 import os
 from pathlib import Path
@@ -58,13 +58,18 @@ if 'localhost' not in frontend_url and '127.0.0.1' not in frontend_url:
 
 print(f"🌐 CORS allowed origins: {allowed_origins}")
 
+# Configure CORS with more permissive settings
 CORS(app, 
-     resources={r"/api/*": {"origins": allowed_origins}},
-     supports_credentials=True,
-     allow_headers=['Content-Type', 'Authorization', 'Accept'],
-     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-     expose_headers=['Content-Type'],
-     max_age=3600)
+     resources={
+         r"/api/*": {
+             "origins": allowed_origins,
+             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+             "allow_headers": ["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With"],
+             "expose_headers": ["Content-Type", "Set-Cookie"],
+             "supports_credentials": True,
+             "max_age": 3600
+         }
+     })
 
 # Session configuration for production (cross-domain)
 is_production = os.getenv('RENDER', '').lower() in ['true', '1', 'yes']
@@ -77,6 +82,19 @@ app.config['SESSION_COOKIE_DOMAIN'] = None  # Allow cross-domain cookies
 app.config['PERMANENT_SESSION_LIFETIME'] = 86400 * 7  # 7 days
 
 print(f"🍪 Cookie config - Secure: {app.config['SESSION_COOKIE_SECURE']}, SameSite: {app.config['SESSION_COOKIE_SAMESITE']}")
+
+# Add after_request handler to ensure CORS headers on all responses
+@app.after_request
+def after_request(response):
+    origin = request.headers.get('Origin')
+    if origin in allowed_origins:
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, Accept, Origin, X-Requested-With'
+        response.headers['Access-Control-Expose-Headers'] = 'Content-Type, Set-Cookie'
+    return response
+
 
 # Ensure upload folder exists
 app.config['UPLOAD_FOLDER'].mkdir(exist_ok=True)
