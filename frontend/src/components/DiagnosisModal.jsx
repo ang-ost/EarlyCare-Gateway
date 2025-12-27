@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { getApiUrl } from '../config'
 
 export default function DiagnosisModal({ patient, selectedRecord, onClose }) {
   const [loading, setLoading] = useState(true)
@@ -20,7 +21,7 @@ export default function DiagnosisModal({ patient, selectedRecord, onClose }) {
         ? { fiscal_code: patient.codice_fiscale, clinical_record: selectedRecord }
         : { fiscal_code: patient.codice_fiscale }
 
-      const res = await fetch('/api/diagnostics/generate', {
+      const res = await fetch(getApiUrl('/api/diagnostics/generate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

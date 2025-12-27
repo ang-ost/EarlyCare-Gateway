@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { getApiUrl } from '../config'
 import Toast from '../components/Toast'
 import DiagnosisModal from '../components/DiagnosisModal'
 import comuni from 'comuni-json/comuni.json'
@@ -51,7 +52,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
   const [calculatedCF, setCalculatedCF] = useState('')
 
   const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+    await fetch(getApiUrl('/api/auth/logout'), { method: 'POST', credentials: 'include' })
     onLogout()
   }
 
@@ -93,7 +94,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
 
     try {
       const fiscalCode = foundPatient.codice_fiscale || foundPatient.fiscal_code
-      const res = await fetch(`/api/export/${fiscalCode}`, {
+      const res = await fetch(getApiUrl(`/api/export/${fiscalCode}`), {
         credentials: 'include'
       })
 
@@ -127,7 +128,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
       // Chiama il backend per calcolare il CF
       const fetchCF = async () => {
         try {
-          const res = await fetch('/api/patient/calculate-cf', {
+          const res = await fetch(getApiUrl('/api/patient/calculate-cf'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
@@ -168,7 +169,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
     setClinicalRecords([])
 
     try {
-      const res = await fetch('/api/patient/search', {
+      const res = await fetch(getApiUrl('/api/patient/search'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -186,7 +187,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
         setShowPatientSearch(false)
         
         // Carica record
-        const recordsRes = await fetch(`/api/patient/${searchFiscalCode.trim().toUpperCase()}/records`, {
+        const recordsRes = await fetch(getApiUrl(`/api/patient/${searchFiscalCode.trim().toUpperCase()}/records`), {
           credentials: 'include'
         })
         if (recordsRes.ok) {
@@ -207,7 +208,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
     setLoading(true)
 
     try {
-      const res = await fetch('/api/patient/create', {
+      const res = await fetch(getApiUrl('/api/patient/create'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -275,7 +276,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
         formData.append('files[]', file)
       })
 
-      const res = await fetch('/api/folder/upload', {
+      const res = await fetch(getApiUrl('/api/folder/upload'), {
         method: 'POST',
         credentials: 'include',
         body: formData
@@ -298,7 +299,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
 
       // Ricarica le schede cliniche
       const fiscalCode = foundPatient.codice_fiscale || foundPatient.fiscal_code
-      const recordsRes = await fetch(`/api/patient/${fiscalCode}/records`, {
+      const recordsRes = await fetch(getApiUrl(`/api/patient/${fiscalCode}/records`), {
         credentials: 'include'
       })
       if (recordsRes.ok) {
@@ -341,7 +342,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
         formData.append('files', file)
       })
 
-      const res = await fetch(`/api/patient/${foundPatient.codice_fiscale}/add-record`, {
+      const res = await fetch(getApiUrl(`/api/patient/${foundPatient.codice_fiscale}/add-record`), {
         method: 'POST',
         credentials: 'include',
         body: formData
@@ -375,7 +376,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
       setRecordFiles([])
 
       // Ricarica record
-      const recordsRes = await fetch(`/api/patient/${foundPatient.codice_fiscale}/records`, {
+      const recordsRes = await fetch(getApiUrl(`/api/patient/${foundPatient.codice_fiscale}/records`), {
         credentials: 'include'
       })
       if (recordsRes.ok) {
@@ -763,7 +764,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                       setLoading(true)
                       try {
                         const fiscalCode = foundPatient.codice_fiscale || foundPatient.fiscal_code
-                        const res = await fetch(`/api/patient/${fiscalCode}/records/delete`, {
+                        const res = await fetch(getApiUrl(`/api/patient/${fiscalCode}/records/delete`), {
                           method: 'DELETE',
                           headers: { 'Content-Type': 'application/json' },
                           credentials: 'include',
@@ -781,7 +782,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                         setSelectedRecord(null)
                         
                         // Ricarica le schede cliniche
-                        const recordsRes = await fetch(`/api/patient/${fiscalCode}/records`, {
+                        const recordsRes = await fetch(getApiUrl(`/api/patient/${fiscalCode}/records`), {
                           credentials: 'include'
                         })
                         if (recordsRes.ok) {
