@@ -102,7 +102,7 @@ Generato da EarlyCare Gateway - ${new Date().toISOString()}
             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>
               <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⌛</span>
             </div>
-            <p style={{ color: '#6b7280', fontSize: '1.1rem' }}>Analisi in corso con AI Gemini...</p>
+            <p style={{ color: '#6b7280', fontSize: '1.1rem' }}>Analisi in corso con assistente AI...</p>
             <p style={{ color: '#9ca3af', fontSize: '0.9rem' }}>L'analisi potrebbe richiedere alcuni secondi</p>
           </div>
         )}
@@ -206,7 +206,7 @@ Generato da EarlyCare Gateway - ${new Date().toISOString()}
 
             <div className="modal-buttons">
               <button onClick={downloadDiagnosis} className="btn btn-secondary">
-                Scarica PDF
+                Esporta
               </button>
               <button onClick={onClose} className="btn btn-primary">
                 Chiudi
