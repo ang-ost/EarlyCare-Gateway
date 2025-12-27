@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { getApiUrl } from '../config'
 import '../styles/chatbot.css'
 
 export default function MedicalChatbot() {
@@ -47,7 +48,7 @@ export default function MedicalChatbot() {
     setIsLoading(true)
 
     try {
-      const response = await fetch('/api/chatbot/ask', {
+      const response = await fetch(getApiUrl('/api/chatbot/ask'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

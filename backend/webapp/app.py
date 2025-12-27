@@ -3,7 +3,6 @@ EarlyCare Gateway - Flask Web Application
 """
 
 from flask import Flask, render_template, request, jsonify, send_file, session
-from flask_cors import CORS
 from werkzeug.utils import secure_filename
 import os
 from pathlib import Path
@@ -13,6 +12,14 @@ import sys
 from functools import wraps
 import zipfile
 import io
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import cm
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
+import PyPDF2
+import re
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -47,36 +54,11 @@ app.secret_key = Config.FLASK_SECRET_KEY
 app.config['UPLOAD_FOLDER'] = Path(__file__).parent / 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = Config.MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
-# Enable CORS for frontend communication
-# Allow multiple origins for development and production
-frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5173')
-allowed_origins = [origin.strip() for origin in frontend_url.split(',')]
-
-# Add localhost for development
-if 'localhost' not in frontend_url and '127.0.0.1' not in frontend_url:
-    allowed_origins.extend(['http://localhost:5173', 'http://127.0.0.1:5173'])
-
-print(f"🌐 CORS allowed origins: {allowed_origins}")
-
-CORS(app, 
-     resources={r"/api/*": {"origins": allowed_origins}},
-     supports_credentials=True,
-     allow_headers=['Content-Type', 'Authorization', 'Accept'],
-     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-     expose_headers=['Content-Type'],
-     max_age=3600)
-
-# Session configuration for production (cross-domain)
-is_production = os.getenv('RENDER', '').lower() in ['true', '1', 'yes']
-print(f"🔧 Production mode: {is_production}")
-
-app.config['SESSION_COOKIE_SECURE'] = is_production  # HTTPS only in production
+# Session configuration
+app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'None' if is_production else 'Lax'  # None for cross-domain
-app.config['SESSION_COOKIE_DOMAIN'] = None  # Allow cross-domain cookies
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = 86400 * 7  # 7 days
-
-print(f"🍪 Cookie config - Secure: {app.config['SESSION_COOKIE_SECURE']}, SameSite: {app.config['SESSION_COOKIE_SAMESITE']}")
 
 # Ensure upload folder exists
 app.config['UPLOAD_FOLDER'].mkdir(exist_ok=True)
@@ -116,8 +98,11 @@ def initialize_system():
         # Initialize AI Diagnostics
         if AI_AVAILABLE and hasattr(Config, 'GEMINI_API_KEY') and Config.GEMINI_API_KEY:
             try:
-                ai_diagnostics = MedicalDiagnosticsAI(api_key=Config.GEMINI_API_KEY)
+                ai_diagnostics = MedicalDiagnosticsAI(
+                    api_key=Config.GEMINI_API_KEY
+                )
                 print("✅ AI Medical Diagnostics initialized successfully")
+                print(f"   Gemini: ✅")
             except Exception as e:
                 print(f"⚠️  AI Diagnostics initialization failed: {e}")
                 ai_diagnostics = None
@@ -176,6 +161,105 @@ def require_login(f):
         return f(*args, **kwargs)
     return decorated_function
 
+
+# ========== PDF PARSING UTILITIES ==========
+def extract_clinical_records_from_pdf(pdf_path):
+    """
+    Extracts clinical records from an exported PDF.
+    Returns a list of clinical records if the PDF is an exported clinical record,
+    otherwise returns None.
+    """
+    try:
+        with open(pdf_path, 'rb') as file:
+            pdf_reader = PyPDF2.PdfReader(file)
+            text = ""
+            for page in pdf_reader.pages:
+                text += page.extract_text()
+        
+        print(f"DEBUG PDF: Extracted text length: {len(text)}")
+        
+        # Check if this is an exported clinical record PDF
+        if "Cartella Clinica Elettronica" not in text or "EarlyCare Gateway" not in text:
+            print("DEBUG PDF: Not an exported clinical record PDF")
+            return None
+        
+        print("DEBUG PDF: This is an exported clinical record PDF")
+        records = []
+        
+        # Split by "Scheda Clinica #" to find individual records
+        record_pattern = r'Scheda Clinica #(\d+) - ([\d/]+ [\d:]+)'
+        matches = list(re.finditer(record_pattern, text))
+        
+        print(f"DEBUG PDF: Found {len(matches)} schede cliniche")
+        
+        for i, match in enumerate(matches):
+            start_pos = match.start()
+            end_pos = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+            record_text = text[start_pos:end_pos]
+            
+            print(f"\nDEBUG PDF: Processing record #{i+1}")
+            print(f"DEBUG PDF: Record text length: {len(record_text)}")
+            print(f"DEBUG PDF: Record text preview: {record_text[:200]}...")
+            
+            # Extract fields using regex
+            encounter_id_match = re.search(r'ID Incontro:\s*(.+?)(?:\n|Motivo)', record_text)
+            chief_complaint_match = re.search(r'Motivo Principale:\s*(.+?)(?:\n|Sintomi)', record_text)
+            symptoms_match = re.search(r'Sintomi:\s*(.+?)(?:\n|Priorit)', record_text)
+            priority_match = re.search(r'Priorità:\s*(.+?)(?:\n|Pressione|Note|Scheda)', record_text)
+            
+            # Extract vital signs
+            bp_match = re.search(r'Pressione Sanguigna:\s*(.+?)(?:\n|Frequenza)', record_text)
+            hr_match = re.search(r'Frequenza Cardiaca:\s*(.+?)(?:\n|Temperatura)', record_text)
+            temp_match = re.search(r'Temperatura:\s*(.+?)°C', record_text)
+            o2_match = re.search(r'Saturazione O2:\s*(.+?)(?:\n|Frequenza)', record_text)
+            rr_match = re.search(r'Frequenza Respiratoria:\s*(.+?)(?:\n|Note|Scheda)', record_text)
+            
+            # Extract notes
+            notes_match = re.search(r'Note:\s*(.+?)(?:Scheda Clinica #|Documento generato|\Z)', record_text, re.DOTALL)
+            
+            # Parse timestamp
+            timestamp_str = match.group(2)
+            try:
+                timestamp = datetime.strptime(timestamp_str, '%d/%m/%Y %H:%M:%S')
+            except:
+                timestamp = datetime.now()
+            
+            # Generate unique encounter_id for each import to avoid duplicates
+            unique_encounter_id = f'ENC-IMPORTED-{datetime.now().strftime("%Y%m%d%H%M%S")}-{i}'
+            
+            record = {
+                'timestamp': timestamp.isoformat(),
+                'encounter_id': unique_encounter_id,
+                'motivo_tipo': 'Importato da PDF',
+                'motivo': chief_complaint_match.group(1).strip() if chief_complaint_match else 'N/A',
+                'chief_complaint': chief_complaint_match.group(1).strip() if chief_complaint_match else 'N/A',
+                'symptoms': symptoms_match.group(1).strip() if symptoms_match else '',
+                'notes': notes_match.group(1).strip() if notes_match else '',
+                'priority': priority_match.group(1).strip() if priority_match else 'routine',
+                'vital_signs': {
+                    'blood_pressure': bp_match.group(1).strip() if bp_match else '',
+                    'heart_rate': hr_match.group(1).strip() if hr_match else '',
+                    'temperature': temp_match.group(1).strip() if temp_match else '',
+                    'oxygen_saturation': o2_match.group(1).strip() if o2_match else '',
+                    'respiratory_rate': rr_match.group(1).strip() if rr_match else ''
+                },
+                'attachments': [],
+                'doctor_name': 'Importato da PDF',
+                'doctor_specialization': '',
+                'original_encounter_id': encounter_id_match.group(1).strip() if encounter_id_match else 'N/A'
+            }
+            
+            print(f"DEBUG PDF: Record extracted - ID: {record['encounter_id']}, Motivo: {record['motivo']}")
+            records.append(record)
+        
+        print(f"DEBUG PDF: Total records extracted: {len(records)}")
+        return records if records else None
+        
+    except Exception as e:
+        print(f"Error extracting records from PDF: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 # ========== AUTHENTICATION ROUTES ==========
 
@@ -487,6 +571,48 @@ def create_patient():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/patient/calculate-cf', methods=['POST'])
+def calculate_cf():
+    """Calculate Codice Fiscale in real-time."""
+    data = request.json
+    
+    try:
+        from src.privacy.codice_fiscale import calculate_codice_fiscale
+        
+        # Extract data
+        cognome = data.get('cognome', '')
+        nome = data.get('nome', '')
+        data_nascita = data.get('data_nascita', '')  # Format: YYYY-MM-DD
+        sesso = data.get('sesso', 'M')
+        comune_nascita = data.get('comune_nascita', '')
+        
+        if not all([cognome, nome, data_nascita, sesso, comune_nascita]):
+            missing = [k for k in ['cognome', 'nome', 'data_nascita', 'sesso', 'comune_nascita'] if not data.get(k)]
+            return jsonify({'error': f'Dati incompleti: {", ".join(missing)}'}), 400
+        
+        # Convert date format from YYYY-MM-DD to DD/MM/YYYY for the function
+        date_obj = datetime.strptime(data_nascita, '%Y-%m-%d')
+        date_formatted = date_obj.strftime('%d/%m/%Y')
+        
+        cf = calculate_codice_fiscale(
+            cognome=cognome,
+            nome=nome,
+            data_nascita=date_formatted,
+            sesso=sesso,
+            comune_nascita=comune_nascita
+        )
+        
+        if not cf:
+            return jsonify({'error': 'Impossibile calcolare il codice fiscale'}), 400
+        
+        return jsonify({'codice_fiscale': cf})
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Errore nel calcolo: {str(e)}'}), 500
+
+
 @app.route('/api/patient/<fiscal_code>/records', methods=['GET'])
 @require_login
 def get_patient_records(fiscal_code):
@@ -501,6 +627,40 @@ def get_patient_records(fiscal_code):
         
         records = patient_data.get('cartelle_cliniche', [])
         return jsonify({'success': True, 'records': records})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/patient/<fiscal_code>/records/delete', methods=['DELETE'])
+@require_login
+def delete_clinical_records(fiscal_code):
+    """Delete multiple clinical records from a patient."""
+    if not db_connected:
+        return jsonify({'error': 'Database non connesso'}), 500
+    
+    try:
+        data = request.json
+        indexes = data.get('indexes', [])
+        
+        if not indexes:
+            return jsonify({'error': 'Nessuna scheda selezionata'}), 400
+        
+        # Get patient data
+        patient_data = db.find_by_fiscal_code(fiscal_code)
+        if not patient_data:
+            return jsonify({'error': 'Paziente non trovato'}), 404
+        
+        # Delete records by indexes
+        success = db.delete_clinical_records(fiscal_code, indexes)
+        
+        if success:
+            return jsonify({
+                'success': True, 
+                'message': f'{len(indexes)} scheda/e clinica/che eliminata/e con successo'
+            })
+        else:
+            return jsonify({'error': 'Errore durante l\'eliminazione delle schede'}), 500
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -526,22 +686,26 @@ def add_clinical_record(fiscal_code):
             data = request.form
             attachments = []
             
-            # Handle file uploads
+            # Handle file uploads - save as base64 in database
             if 'files' in request.files:
                 files = request.files.getlist('files')
-                upload_folder = app.config['UPLOAD_FOLDER'] / fiscal_code / datetime.now().strftime('%Y%m%d_%H%M%S')
-                upload_folder.mkdir(parents=True, exist_ok=True)
                 
                 for file in files:
                     if file and file.filename:
                         filename = secure_filename(file.filename)
-                        filepath = upload_folder / filename
-                        file.save(filepath)
+                        file_content = file.read()
+                        
+                        # Encode file content as base64
+                        import base64
+                        file_base64 = base64.b64encode(file_content).decode('utf-8')
+                        
+                        # Save attachment with base64 content
                         attachments.append({
                             'name': filename,
-                            'path': str(filepath),
-                            'size': filepath.stat().st_size,
-                            'type': file.content_type
+                            'content': file_base64,
+                            'size': len(file_content),
+                            'type': file.content_type or 'application/octet-stream',
+                            'uploaded_at': datetime.now().isoformat()
                         })
         
         # Parse vital_signs if it's a string
@@ -590,99 +754,156 @@ def upload_folder():
     fiscal_code = request.form.get('fiscal_code')
     
     try:
-        # Create temporary folder for upload
-        temp_folder = app.config['UPLOAD_FOLDER'] / fiscal_code / datetime.now().strftime('%Y%m%d_%H%M%S')
-        temp_folder.mkdir(parents=True, exist_ok=True)
+        # Process PDF files directly from memory without saving to disk
+        extracted_records_count = 0
         
-        # Save all files
-        saved_files = []
-        attachments = []
         for file in files:
-            if file.filename:
-                filename = secure_filename(file.filename)
-                filepath = temp_folder / filename
-                file.save(filepath)
-                saved_files.append(str(filepath))
-                attachments.append({
-                    'name': filename,
-                    'path': str(filepath),
-                    'size': filepath.stat().st_size,
-                    'type': file.content_type or 'application/octet-stream'
-                })
+            if file.filename and file.filename.lower().endswith('.pdf'):
+                # Read PDF content into memory
+                pdf_content = file.read()
+                
+                # Create a temporary file object to parse the PDF
+                import io
+                pdf_file = io.BytesIO(pdf_content)
+                
+                # Try to extract clinical records from PDF
+                print(f"Checking PDF for clinical records: {file.filename}")
+                
+                # Extract using PyPDF2 from memory
+                try:
+                    from PyPDF2 import PdfReader
+                    reader = PdfReader(pdf_file)
+                    text = ''
+                    for page in reader.pages:
+                        text += page.extract_text()
+                    
+                    # Check if it's an exported clinical record PDF
+                    if 'Cartella Clinica Elettronica' in text and 'EarlyCare Gateway' in text:
+                        print("DEBUG PDF: This is an exported clinical record PDF")
+                        records = []
+                        
+                        # Split by "Scheda Clinica #" to find individual records
+                        record_pattern = r'Scheda Clinica #(\d+) - ([\d/]+ [\d:]+)'
+                        matches = list(re.finditer(record_pattern, text))
+                        
+                        print(f"DEBUG PDF: Found {len(matches)} schede cliniche")
+                        
+                        for i, match in enumerate(matches):
+                            start_pos = match.start()
+                            end_pos = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+                            record_text = text[start_pos:end_pos]
+                            
+                            # Extract fields using regex
+                            encounter_id_match = re.search(r'ID Incontro:\s*(.+?)(?:\n|Motivo)', record_text)
+                            chief_complaint_match = re.search(r'Motivo Principale:\s*(.+?)(?:\n|Sintomi)', record_text)
+                            symptoms_match = re.search(r'Sintomi:\s*(.+?)(?:\n|Priorit)', record_text)
+                            priority_match = re.search(r'Priorità:\s*(.+?)(?:\n|Pressione|Note|Scheda)', record_text)
+                            
+                            # Extract vital signs
+                            bp_match = re.search(r'Pressione Sanguigna:\s*(.+?)(?:\n|Frequenza)', record_text)
+                            hr_match = re.search(r'Frequenza Cardiaca:\s*(.+?)(?:\n|Temperatura)', record_text)
+                            temp_match = re.search(r'Temperatura:\s*(.+?)°C', record_text)
+                            o2_match = re.search(r'Saturazione O2:\s*(.+?)(?:\n|Frequenza)', record_text)
+                            rr_match = re.search(r'Frequenza Respiratoria:\s*(.+?)(?:\n|Note|Scheda)', record_text)
+                            
+                            # Extract notes
+                            notes_match = re.search(r'Note:\s*(.+?)(?:Allegati:|ATTACHMENT_DATA_START|Scheda Clinica #|Documento generato|\Z)', record_text, re.DOTALL)
+                            
+                            # Extract attachments from JSON metadata section
+                            attachments = []
+                            print(f"DEBUG: Looking for attachments in record #{i+1}")
+                            
+                            # Parse timestamp
+                            timestamp_str = match.group(2)
+                            try:
+                                timestamp = datetime.strptime(timestamp_str, '%d/%m/%Y %H:%M:%S')
+                            except:
+                                timestamp = datetime.now()
+                            
+                            # Generate unique encounter_id for each import
+                            unique_encounter_id = f'ENC-IMPORTED-{datetime.now().strftime("%Y%m%d%H%M%S")}-{i}'
+                            
+                            record = {
+                                'timestamp': timestamp.isoformat(),
+                                'encounter_id': unique_encounter_id,
+                                'motivo_tipo': 'Importato da PDF',
+                                'motivo': chief_complaint_match.group(1).strip() if chief_complaint_match else 'N/A',
+                                'chief_complaint': chief_complaint_match.group(1).strip() if chief_complaint_match else 'N/A',
+                                'symptoms': symptoms_match.group(1).strip() if symptoms_match else '',
+                                'notes': notes_match.group(1).strip() if notes_match else '',
+                                'priority': priority_match.group(1).strip() if priority_match else 'routine',
+                                'vital_signs': {
+                                    'blood_pressure': bp_match.group(1).strip() if bp_match else '',
+                                    'heart_rate': hr_match.group(1).strip() if hr_match else '',
+                                    'temperature': temp_match.group(1).strip() if temp_match else '',
+                                    'oxygen_saturation': o2_match.group(1).strip() if o2_match else '',
+                                    'respiratory_rate': rr_match.group(1).strip() if rr_match else ''
+                                },
+                                'attachments': attachments,
+                                'original_encounter_id': encounter_id_match.group(1).strip() if encounter_id_match else 'N/A'
+                            }
+                            
+                            records.append(record)
+                        
+                        # Extract attachments from PDF metadata
+                        attachments_data = {}
+                        try:
+                            # Check if PDF has custom metadata with attachments
+                            if hasattr(reader, 'metadata') and reader.metadata:
+                                metadata_key = '/EarlyCareAttachments'
+                                if metadata_key in reader.metadata:
+                                    print("DEBUG: Found attachments in PDF metadata")
+                                    import json
+                                    import base64
+                                    b64_data = reader.metadata[metadata_key]
+                                    json_str = base64.b64decode(b64_data).decode('utf-8')
+                                    attachments_data = json.loads(json_str)
+                                    print(f"DEBUG: Parsed attachments data for {len(attachments_data)} records")
+                                else:
+                                    print("DEBUG: No EarlyCareAttachments metadata found")
+                            else:
+                                print("DEBUG: PDF has no metadata")
+                        except Exception as e:
+                            print(f"DEBUG: Error reading PDF metadata: {e}")
+                            import traceback
+                            traceback.print_exc()
+                        
+                        # Assign attachments to records
+                        for idx, record in enumerate(records):
+                            record_key = f"record_{idx + 1}"
+                            if record_key in attachments_data:
+                                record['attachments'] = attachments_data[record_key]
+                                print(f"DEBUG: Assigned {len(attachments_data[record_key])} attachments to record #{idx+1}")
+                        
+                        if records:
+                            print(f"✅ Found {len(records)} clinical records in PDF")
+                            # Get current doctor from session
+                            doctor_id = session.get('doctor_id')
+                            doctor_data = db.find_doctor_by_id(doctor_id) if doctor_id and db_connected else None
+                            
+                            # Import each record
+                            for record in records:
+                                record['doctor_id'] = doctor_id
+                                record['doctor_name'] = f"{doctor_data.get('nome', '')} {doctor_data.get('cognome', '')}" if doctor_data else 'Importato da PDF'
+                                record['doctor_specialization'] = doctor_data.get('specializzazione', '') if doctor_data else ''
+                                db.add_clinical_record(fiscal_code, record)
+                                extracted_records_count += 1
+                                print(f"✅ Imported record: {record.get('chief_complaint', 'N/A')}")
+                        
+                except Exception as e:
+                    print(f"Error parsing PDF: {e}")
+                    import traceback
+                    traceback.print_exc()
         
-        # Process folder
-        if processor:
-            results = processor.process_folder(str(temp_folder))
-            
-            # Get current doctor from session
-            doctor_id = session.get('doctor_id')
-            doctor_data = db.find_doctor_by_id(doctor_id) if doctor_id and db_connected else None
-            
-            # Save results if database is connected
-            if db_connected and fiscal_code:
-                # Convert DecisionSupport results to clinical record format
-                top_diagnosis = results.get_top_diagnosis()
-                
-                # Extract file content for notes
-                notes_content = []
-                for filepath in saved_files:
-                    try:
-                        file_path = Path(filepath)
-                        if file_path.suffix.lower() in ['.txt', '.md', '.note']:
-                            with open(filepath, 'r', encoding='utf-8') as f:
-                                notes_content.append(f"=== {file_path.name} ===\n{f.read()}\n")
-                        elif file_path.suffix.lower() == '.pdf':
-                            notes_content.append(f"=== {file_path.name} ===\n[File PDF caricato]\n")
-                    except:
-                        pass
-                
-                # Create clinical record from processing results
-                record = {
-                    'timestamp': datetime.now().isoformat(),
-                    'motivo_tipo': 'Caricamento File',
-                    'motivo': f'File caricati e processati automaticamente ({len(files)} file)',
-                    'tipo_scheda': 'Caricamento File',
-                    'chief_complaint': f'Processamento automatico di {len(files)} file clinici',
-                    'symptoms': '\n'.join(results.clinical_notes) if results.clinical_notes else '',
-                    'diagnosis': top_diagnosis.condition if top_diagnosis else 'In analisi',
-                    'treatment': '\n'.join([f"- {test}" for test in top_diagnosis.recommended_tests]) if top_diagnosis and top_diagnosis.recommended_tests else '',
-                    'notes': '\n'.join(notes_content) if notes_content else f'File processati: {", ".join([Path(f).name for f in saved_files])}',
-                    'vital_signs': {},
-                    'attachments': attachments,
-                    'lab_results': [],
-                    'imaging': [],
-                    'doctor_id': doctor_id,
-                    'doctor_name': f"{doctor_data.get('nome', '')} {doctor_data.get('cognome', '')}" if doctor_data else 'Sistema Automatico',
-                    'doctor_specialization': doctor_data.get('specializzazione', '') if doctor_data else 'AI Processing',
-                    # Additional metadata
-                    'ai_processing': {
-                        'model_used': results.models_used,
-                        'processing_time_ms': results.processing_time_ms,
-                        'confidence': top_diagnosis.confidence_score if top_diagnosis else 0.0,
-                        'alerts': results.alerts,
-                        'warnings': results.warnings,
-                        'all_diagnoses': [
-                            {
-                                'condition': d.condition,
-                                'confidence': d.confidence_score,
-                                'evidence': d.evidence
-                            } for d in results.diagnoses
-                        ]
-                    }
-                }
-                
-                db.add_clinical_record(fiscal_code, record)
-                
-                return jsonify({
-                    'success': True, 
-                    'message': f'{len(files)} file processati e convertiti in scheda clinica',
-                    'diagnosis': top_diagnosis.condition if top_diagnosis else None,
-                    'confidence': top_diagnosis.confidence_score if top_diagnosis else 0.0
-                })
-            else:
-                return jsonify({'error': 'Database non connesso'}), 500
-        else:
-            return jsonify({'error': 'Processore non inizializzato'}), 500
+        # If we extracted records from PDF, return success message
+        if extracted_records_count > 0:
+            return jsonify({
+                'success': True,
+                'message': f'{extracted_records_count} schede cliniche importate dal PDF con successo',
+                'imported_count': extracted_records_count
+            })
+        
+        return jsonify({'error': 'Nessuna scheda clinica trovata nel PDF'}), 400
             
     except Exception as e:
         import traceback
@@ -745,7 +966,7 @@ def get_metrics():
 @app.route('/api/export/<fiscal_code>', methods=['GET'])
 @require_login
 def export_patient_data(fiscal_code):
-    """Export patient data and clinical records as ZIP file."""
+    """Export patient data and clinical records as PDF file."""
     if not db_connected:
         return jsonify({'error': 'Database non connesso'}), 500
     
@@ -755,52 +976,260 @@ def export_patient_data(fiscal_code):
         if not patient_data:
             return jsonify({'error': 'Paziente non trovato'}), 404
         
+        print(f"DEBUG: Patient data keys: {list(patient_data.keys())}")
+        print(f"DEBUG: Comune Nascita (luogo_nascita): '{patient_data.get('luogo_nascita')}'")
+        print(f"DEBUG: Gender (sesso): '{patient_data.get('sesso')}'")
+        print(f"DEBUG: Age: '{patient_data.get('age')}'")
+        print(f"DEBUG: Data nascita: '{patient_data.get('data_nascita')}'")
+        
         # Get clinical records
         clinical_records = []
         try:
-            clinical_records = list(db.get_clinical_records(fiscal_code))
+            clinical_records = db.get_patient_clinical_records(fiscal_code)
+            print(f"DEBUG: Found {len(clinical_records)} clinical records")
+            if clinical_records:
+                print(f"DEBUG: First record keys: {list(clinical_records[0].keys())}")
         except Exception as e:
             print(f"Warning: Could not load clinical records: {e}")
         
-        # Create ZIP file in memory
+        # Create PDF file in memory
         memory_file = io.BytesIO()
-        with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
-            # Add patient info
-            patient_json = json.dumps(patient_data, ensure_ascii=False, indent=2, default=str)
-            zf.writestr('patient_info.json', patient_json)
-            
-            # Add clinical records
-            if clinical_records:
-                records_json = json.dumps(clinical_records, ensure_ascii=False, indent=2, default=str)
-                zf.writestr('clinical_records.json', records_json)
-                
-                # Create individual record files
-                for idx, record in enumerate(clinical_records):
-                    record_filename = f"record_{idx+1}_{record.get('timestamp', 'unknown')}.json"
-                    record_json = json.dumps(record, ensure_ascii=False, indent=2, default=str)
-                    zf.writestr(f"records/{record_filename}", record_json)
-            
-            # Add README
-            readme_content = f"""Cartella Clinica - {patient_data.get('first_name', '')} {patient_data.get('last_name', '')}
-Codice Fiscale: {fiscal_code}
-Data Export: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
-
-Contenuto:
-- patient_info.json: Informazioni anagrafiche del paziente
-- clinical_records.json: Tutte le schede cliniche
-- records/: Schede cliniche individuali
-"""
-            zf.writestr('README.txt', readme_content)
+        doc = SimpleDocTemplate(memory_file, pagesize=A4, 
+                               leftMargin=2*cm, rightMargin=2*cm,
+                               topMargin=2*cm, bottomMargin=2*cm)
         
-        # Seek to beginning of file
-        memory_file.seek(0)
+        # Build content
+        story = []
+        styles = getSampleStyleSheet()
+        
+        # Custom styles
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            textColor=colors.HexColor('#2563eb'),
+            spaceAfter=30,
+            alignment=TA_CENTER
+        )
+        
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=16,
+            textColor=colors.HexColor('#1e40af'),
+            spaceAfter=12,
+            spaceBefore=12
+        )
+        
+        # Title
+        story.append(Paragraph("Cartella Clinica Elettronica", title_style))
+        story.append(Spacer(1, 0.5*cm))
+        
+        # Patient Information Section
+        story.append(Paragraph("Informazioni Paziente", heading_style))
+        
+        # Formatta la data di nascita
+        data_nascita = patient_data.get('data_nascita', 'N/A')
+        if isinstance(data_nascita, datetime):
+            data_nascita = data_nascita.strftime('%d/%m/%Y')
+        elif isinstance(data_nascita, str) and data_nascita != 'N/A':
+            # Se è una stringa in formato YYYY-MM-DD, convertila
+            try:
+                from datetime import datetime as dt
+                data_obj = dt.strptime(data_nascita, '%Y-%m-%d')
+                data_nascita = data_obj.strftime('%d/%m/%Y')
+                # Calcola l'età se non è disponibile
+                if not patient_data.get('age'):
+                    today = datetime.now()
+                    age = today.year - data_obj.year - ((today.month, today.day) < (data_obj.month, data_obj.day))
+                    patient_data['age'] = age
+            except:
+                pass
+        
+        # Gestisci i campi che potrebbero essere None - usa le chiavi corrette restituite da find_by_fiscal_code
+        comune_nascita = patient_data.get('luogo_nascita') or patient_data.get('comune_nascita') or 'N/A'
+        gender = patient_data.get('sesso') or patient_data.get('gender') or 'N/A'
+        age = patient_data.get('age')
+        age_str = str(age) if age is not None else 'N/A'
+        
+        patient_info = [
+            ['Nome:', patient_data.get('nome', 'N/A')],
+            ['Cognome:', patient_data.get('cognome', 'N/A')],
+            ['Codice Fiscale:', fiscal_code],
+            ['Data di Nascita:', str(data_nascita)],
+            ['Comune di Nascita:', comune_nascita],
+            ['Genere:', gender],
+            ['Età:', age_str],
+        ]
+        
+        patient_table = Table(patient_info, colWidths=[5*cm, 12*cm])
+        patient_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#e0e7ff')),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ]))
+        
+        story.append(patient_table)
+        story.append(Spacer(1, 1*cm))
+        
+        # Clinical Records Section
+        if clinical_records:
+            story.append(Paragraph(f"Schede Cliniche ({len(clinical_records)})", heading_style))
+            story.append(Spacer(1, 0.3*cm))
+            
+            for idx, record in enumerate(clinical_records, 1):
+                # Record header
+                timestamp = record.get('timestamp', 'N/A')
+                if isinstance(timestamp, datetime):
+                    timestamp = timestamp.strftime('%d/%m/%Y %H:%M:%S')
+                elif isinstance(timestamp, str):
+                    try:
+                        ts = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                        timestamp = ts.strftime('%d/%m/%Y %H:%M:%S')
+                    except:
+                        pass
+                
+                record_title = f"Scheda Clinica #{idx} - {timestamp}"
+                story.append(Paragraph(record_title, styles['Heading3']))
+                
+                # Record details
+                record_data = [
+                    ['ID Incontro:', str(record.get('encounter_id', 'N/A'))],
+                    ['Motivo Principale:', record.get('chief_complaint', 'N/A')],
+                    ['Sintomi:', record.get('symptoms', 'N/A')],
+                    ['Priorità:', record.get('priority', 'N/A')],
+                ]
+                
+                # Add vital signs if available
+                vital_signs = record.get('vital_signs', {})
+                if vital_signs:
+                    if vital_signs.get('blood_pressure'):
+                        record_data.append(['Pressione Sanguigna:', vital_signs['blood_pressure']])
+                    if vital_signs.get('heart_rate'):
+                        record_data.append(['Frequenza Cardiaca:', vital_signs['heart_rate']])
+                    if vital_signs.get('temperature'):
+                        record_data.append(['Temperatura:', vital_signs['temperature'] + '°C'])
+                    if vital_signs.get('oxygen_saturation'):
+                        record_data.append(['Saturazione O2:', vital_signs['oxygen_saturation']])
+                    if vital_signs.get('respiratory_rate'):
+                        record_data.append(['Frequenza Respiratoria:', vital_signs['respiratory_rate']])
+                
+                record_table = Table(record_data, colWidths=[5*cm, 12*cm])
+                record_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f3f4f6')),
+                    ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                    ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+                    ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+                    ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                    ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 8),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+                    ('TOPPADDING', (0, 0), (-1, -1), 6),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ]))
+                
+                story.append(record_table)
+                
+                # Add notes if available
+                if 'notes' in record and record['notes']:
+                    story.append(Spacer(1, 0.3*cm))
+                    story.append(Paragraph('<b>Note:</b>', styles['Normal']))
+                    notes_text = record['notes']
+                    if isinstance(notes_text, list):
+                        notes_text = ', '.join(str(n) for n in notes_text)
+                    story.append(Paragraph(str(notes_text), styles['Normal']))
+                
+                # Add attachments list if available
+                attachments = record.get('attachments', [])
+                if attachments:
+                    story.append(Spacer(1, 0.3*cm))
+                    story.append(Paragraph('<b>Allegati:</b>', styles['Normal']))
+                    for att in attachments:
+                        att_name = att.get('name', 'N/A')
+                        att_size = att.get('size', 0)
+                        att_type = att.get('type', 'N/A')
+                        size_kb = round(att_size / 1024, 2) if att_size else 0
+                        att_text = f"📎 {att_name} ({size_kb} KB, {att_type})"
+                        story.append(Paragraph(att_text, styles['Normal']))
+                
+                story.append(Spacer(1, 0.5*cm))
+        else:
+            story.append(Paragraph("Nessuna scheda clinica disponibile", styles['Normal']))
+        
+        # Footer
+        story.append(Spacer(1, 1*cm))
+        footer_style = ParagraphStyle(
+            'Footer',
+            parent=styles['Normal'],
+            fontSize=8,
+            textColor=colors.grey,
+            alignment=TA_CENTER
+        )
+        story.append(Paragraph(
+            f"Documento generato il {datetime.now().strftime('%d/%m/%Y alle %H:%M:%S')}",
+            footer_style
+        ))
+        story.append(Paragraph("EarlyCare Gateway - Sistema di Gestione Cartelle Cliniche", footer_style))
+        
+        # Build PDF
+        doc.build(story)
+        
+        # Add attachments as PDF metadata
+        if any(record.get('attachments') for record in clinical_records):
+            import json
+            import base64
+            from PyPDF2 import PdfReader, PdfWriter
+            
+            # Read the generated PDF
+            memory_file.seek(0)
+            reader = PdfReader(memory_file)
+            writer = PdfWriter()
+            
+            # Copy all pages
+            for page in reader.pages:
+                writer.add_page(page)
+            
+            # Prepare attachments data
+            attachments_data = {}
+            for idx, record in enumerate(clinical_records, 1):
+                if record.get('attachments'):
+                    attachments_data[f"record_{idx}"] = record['attachments']
+            
+            # Add as custom metadata
+            if attachments_data:
+                json_data = json.dumps(attachments_data, ensure_ascii=False)
+                writer.add_metadata({
+                    '/EarlyCareAttachments': base64.b64encode(json_data.encode('utf-8')).decode('ascii')
+                })
+            
+            # Write to new memory file
+            output_file = io.BytesIO()
+            writer.write(output_file)
+            output_file.seek(0)
+            memory_file = output_file
+        else:
+            # Seek to beginning of file
+            memory_file.seek(0)
         
         # Generate filename
-        filename = f"cartella_clinica_{fiscal_code}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+        filename = f"cartella_clinica_{fiscal_code}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         
         return send_file(
             memory_file,
-            mimetype='application/zip',
+            mimetype='application/pdf',
             as_attachment=True,
             download_name=filename
         )
@@ -1120,19 +1549,7 @@ def health():
     return jsonify({
         'status': 'healthy',
         'db_connected': db_connected,
-        'ai_available': ai_diagnostics is not None,
-        'cors_origins': allowed_origins,
-        'is_production': is_production
-    }), 200
-
-
-@app.route('/api/test-cors', methods=['GET', 'OPTIONS'])
-def test_cors():
-    """Test CORS configuration."""
-    return jsonify({
-        'message': 'CORS is working!',
-        'origin': request.headers.get('Origin'),
-        'allowed_origins': allowed_origins
+        'ai_available': ai_diagnostics is not None
     }), 200
 
 

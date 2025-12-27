@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
+import { getApiUrl } from '../config'
 import Toast from '../components/Toast'
 import DiagnosisModal from '../components/DiagnosisModal'
+import comuni from 'comuni-json/comuni.json'
 
 export default function Dashboard({ user, onNavigate, onLogout }) {
   const [showMenu, setShowMenu] = useState(false)
@@ -25,9 +27,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
     data_nascita: '',
     data_decesso: '',
     comune_nascita: '',
-    codice_istat_comune: '',
     sesso: 'M',
-    codice_fiscale: '',
     allergie: '',
     malattie_permanenti: ''
   })
@@ -47,140 +47,60 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
   const [recordFiles, setRecordFiles] = useState([])
   const [uploadedFiles, setUploadedFiles] = useState([])
   const [isDragging, setIsDragging] = useState(false)
+  const [comuniSuggest, setComuniSuggest] = useState([])
+  const [showComuniList, setShowComuniList] = useState(false)
+  const [calculatedCF, setCalculatedCF] = useState('')
 
   const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+    await fetch(getApiUrl('/api/auth/logout'), { method: 'POST', credentials: 'include' })
     onLogout()
   }
 
-  // Calcolo automatico codice fiscale - Algoritmo italiano standard
-  const calculateCodiceFiscale = (nome, cognome, dataNascita, codicISTAT, sesso) => {
-    if (!nome || !cognome || !dataNascita || !codicISTAT || !sesso) return ''
+  // Filtra i comuni in base a quello che digita l'utente
+  const handleComuneInput = (value) => {
+    const updatedData = { ...createFormData, comune_nascita: value }
+    setCreateFormData(updatedData)
 
-    try {
-      // Funzione per estrarre consonanti
-      const getConsonants = (str) => {
-        return str.toUpperCase().replace(/[AEIOU]/g, '')
-      }
-
-      // Funzione per estrarre vocali
-      const getVowels = (str) => {
-        return str.toUpperCase().replace(/[^AEIOU]/g, '')
-      }
-
-      // COGNOME: prime 3 consonanti, se meno aggiungere vocali, se ancora meno aggiungere X
-      const cognomeConsonants = getConsonants(cognome)
-      const cognomeVowels = getVowels(cognome)
-      let cognomeCode = (cognomeConsonants + cognomeVowels).slice(0, 3).padEnd(3, 'X')
-
-      // NOME: 1° consonante, 3° consonante, 4° consonante
-      // Se ha meno di 4 consonanti, prendere il 1°, il 2° e il 3°
-      const nomeConsonants = getConsonants(nome)
-      const nomeVowels = getVowels(nome)
-      let nomeCode = ''
-      
-      if (nomeConsonants.length >= 4) {
-        nomeCode = nomeConsonants[0] + nomeConsonants[2] + nomeConsonants[3]
-      } else {
-        nomeCode = (nomeConsonants + nomeVowels).slice(0, 3).padEnd(3, 'X')
-      }
-
-      // DATA NASCITA: YY + MM + GG (con MM codificato e GG +40 se femmina)
-      const [year, month, day] = dataNascita.split('-')
-      const yy = year.slice(-2)
-      
-      const monthCodes = ['A', 'B', 'C', 'D', 'E', 'H', 'L', 'M', 'P', 'R', 'S', 'T']
-      const monthNum = parseInt(month)
-      if (monthNum < 1 || monthNum > 12) return ''
-      const mm = monthCodes[monthNum - 1]
-      
-      const dayNum = parseInt(day)
-      const gg = sesso === 'F' ? (dayNum + 40).toString().padStart(2, '0') : day.padStart(2, '0')
-
-      // COMUNE: codice ISTAT (4 caratteri fornito dall'utente)
-      const comuneCode = codicISTAT.toUpperCase().trim()
-      if (comuneCode.length !== 4) return ''
-
-      // NUMERO PROGRESSIVO: sempre '00' per questa versione semplificata
-      const progressivo = '00'
-
-      // BASE CF (15 caratteri)
-      const baseCF = cognomeCode + nomeCode + yy + mm + gg + comuneCode + progressivo
-
-      // CARATTERE DI CONTROLLO: algoritmo ufficiale italiano
-      const alfabeto = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-      const numeri = '0123456789'
-      const tavola1 = {
-        '0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
-        'A': 10, 'B': 11, 'C': 12, 'D': 13, 'E': 14, 'F': 15, 'G': 16, 'H': 17, 'I': 18,
-        'J': 19, 'K': 20, 'L': 21, 'M': 22, 'N': 23, 'O': 24, 'P': 25, 'Q': 26, 'R': 27,
-        'S': 28, 'T': 29, 'U': 30, 'V': 31, 'W': 32, 'X': 33, 'Y': 34, 'Z': 35
-      }
-
-      const tavola2 = {
-        0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9,
-        10: 'A', 11: 'B', 12: 'C', 13: 'D', 14: 'E', 15: 'F', 16: 'G', 17: 'H', 18: 'I',
-        19: 'J', 20: 'K', 21: 'L', 22: 'M', 23: 'N', 24: 'O', 25: 'P', 26: 'Q', 27: 'R',
-        28: 'S', 29: 'T', 30: 'U', 31: 'V', 32: 'W', 33: 'X', 34: 'Y', 35: 'Z'
-      }
-
-      const pariDispari = {
-        0: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35],
-        1: [1, 0, 5, 7, 6, 8, 9, 13, 15, 17, 18, 20, 16, 19, 25, 20, 29, 31, 4, 34, 32, 30, 26, 28, 27, 29, 23, 3, 2, 33, 35, 10, 14, 25, 24, 11]
-      }
-
-      let somma = 0
-      for (let i = 0; i < baseCF.length; i++) {
-        const char = baseCF[i]
-        const valoreChar = tavola1[char]
-        const indice = i % 2
-        somma += pariDispari[indice][valoreChar]
-      }
-
-      const resto = somma % 26
-      const controlChar = alfabeto[resto]
-
-      return (baseCF + controlChar).toUpperCase()
-    } catch (error) {
-      console.error('Errore nel calcolo del codice fiscale:', error)
-      return ''
+    if (value.length > 0) {
+      const filtered = comuni.filter(c => 
+        c.nome.toUpperCase().startsWith(value.toUpperCase())
+      ).slice(0, 10) // Mostra solo i primi 10
+      setComuniSuggest(filtered)
+      setShowComuniList(true)
+    } else {
+      setComuniSuggest([])
+      setShowComuniList(false)
     }
+  }
+
+  // Seleziona un comune dalla lista
+  const selectComune = (comune) => {
+    const updatedData = { ...createFormData, comune_nascita: comune.nome }
+    setCreateFormData(updatedData)
+    setShowComuniList(false)
+    setComuniSuggest([])
   }
 
   const handleCreateFormChange = (e) => {
     const { name, value } = e.target
-    const updatedData = { ...createFormData, [name]: value }
-
-    // Calcola automaticamente il codice fiscale se i campi necessari sono compilati
-    if (['nome', 'cognome', 'data_nascita', 'codice_istat_comune', 'sesso'].includes(name)) {
-      const cf = calculateCodiceFiscale(
-        updatedData.nome,
-        updatedData.cognome,
-        updatedData.data_nascita,
-        updatedData.codice_istat_comune,
-        updatedData.sesso
-      )
-      updatedData.codice_fiscale = cf
-    }
-
-    setCreateFormData(updatedData)
+    setCreateFormData({ ...createFormData, [name]: value })
   }
 
   const handleExport = async () => {
     if (!foundPatient) {
-      setToast({ type: 'warning', message: 'Seleziona prima un paziente', icon: '⚠️' })
+      setToast({ type: 'warning', message: 'Seleziona prima un paziente' })
       return
     }
 
     try {
       const fiscalCode = foundPatient.codice_fiscale || foundPatient.fiscal_code
-      const res = await fetch(`/api/export/${fiscalCode}`, {
+      const res = await fetch(getApiUrl(`/api/export/${fiscalCode}`), {
         credentials: 'include'
       })
 
       if (!res.ok) {
         const errorData = await res.json()
-        setToast({ type: 'error', message: errorData.error || 'Errore durante l\'export', icon: '❌' })
+        setToast({ type: 'error', message: errorData.error || 'Errore durante l\'export' })
         return
       }
 
@@ -195,11 +115,46 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
 
-      setToast({ type: 'success', message: 'Cartella clinica esportata con successo', icon: '✅' })
+      setToast({ type: 'success', message: 'Cartella clinica esportata con successo' })
     } catch (err) {
-      setToast({ type: 'error', message: 'Errore di connessione', icon: '❌' })
+      setToast({ type: 'error', message: 'Errore di connessione' })
     }
   }
+
+  // Calcola il CF man mano che si inseriscono i dati
+  useEffect(() => {
+    const { nome, cognome, data_nascita, sesso, comune_nascita } = createFormData
+    if (nome && cognome && data_nascita && sesso && comune_nascita) {
+      // Chiama il backend per calcolare il CF
+      const fetchCF = async () => {
+        try {
+          const res = await fetch(getApiUrl('/api/patient/calculate-cf'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              nome: nome.trim(),
+              cognome: cognome.trim(),
+              data_nascita: data_nascita.trim(),
+              sesso: sesso.trim(),
+              comune_nascita: comune_nascita.trim()
+            })
+          })
+          const data = await res.json()
+          if (res.ok && data.codice_fiscale) {
+            setCalculatedCF(data.codice_fiscale)
+          } else {
+            setCalculatedCF('⚠️ Errore nel calcolo')
+          }
+        } catch (err) {
+          setCalculatedCF('⚠️ Errore di connessione')
+        }
+      }
+      fetchCF()
+    } else {
+      setCalculatedCF('')
+    }
+  }, [createFormData.nome, createFormData.cognome, createFormData.data_nascita, createFormData.sesso, createFormData.comune_nascita])
 
   const handlePatientSearch = async (e) => {
     e.preventDefault()
@@ -214,7 +169,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
     setClinicalRecords([])
 
     try {
-      const res = await fetch('/api/patient/search', {
+      const res = await fetch(getApiUrl('/api/patient/search'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -232,7 +187,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
         setShowPatientSearch(false)
         
         // Carica record
-        const recordsRes = await fetch(`/api/patient/${searchFiscalCode.trim().toUpperCase()}/records`, {
+        const recordsRes = await fetch(getApiUrl(`/api/patient/${searchFiscalCode.trim().toUpperCase()}/records`), {
           credentials: 'include'
         })
         if (recordsRes.ok) {
@@ -253,30 +208,35 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
     setLoading(true)
 
     try {
-      const res = await fetch('/api/patient/create', {
+      const res = await fetch(getApiUrl('/api/patient/create'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           nome: createFormData.nome,
           cognome: createFormData.cognome,
-          codice_fiscale: createFormData.codice_fiscale.toUpperCase(),
           data_nascita: createFormData.data_nascita,
           data_decesso: createFormData.data_decesso || undefined,
           comune_nascita: createFormData.comune_nascita,
           sesso: createFormData.sesso,
-          allergie: createFormData.allergie ? createFormData.allergie.split(',').map(s => s.trim()) : [],
-          malattie_permanenti: createFormData.malattie_permanenti ? createFormData.malattie_permanenti.split(',').map(s => s.trim()) : []
+          allergie: createFormData.allergie,
+          malattie_permanenti: createFormData.malattie_permanenti
         })
       })
 
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error || 'Errore nella creazione')
+        // Handle validation errors from backend
+        if (data.errors && Array.isArray(data.errors)) {
+          const errorMessages = data.errors.map(err => `${err.field}: ${err.message}`).join('\n')
+          setToast({ type: 'error', message: errorMessages })
+        } else {
+          setToast({ type: 'error', message: data.error || 'Errore nella creazione' })
+        }
         return
       }
 
-      alert('Paziente creato con successo!')
+      setToast({ type: 'success', message: 'Paziente creato con successo!' })
       setShowPatientForm(false)
       setCreateFormData({
         nome: '',
@@ -285,12 +245,11 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
         data_decesso: '',
         comune_nascita: '',
         sesso: 'M',
-        codice_fiscale: '',
         allergie: '',
         malattie_permanenti: ''
       })
     } catch (err) {
-      setError('Errore di connessione: ' + err.message)
+      setToast({ type: 'error', message: 'Errore di connessione: ' + err.message })
     } finally {
       setLoading(false)
     }
@@ -317,7 +276,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
         formData.append('files[]', file)
       })
 
-      const res = await fetch('/api/folder/upload', {
+      const res = await fetch(getApiUrl('/api/folder/upload'), {
         method: 'POST',
         credentials: 'include',
         body: formData
@@ -340,7 +299,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
 
       // Ricarica le schede cliniche
       const fiscalCode = foundPatient.codice_fiscale || foundPatient.fiscal_code
-      const recordsRes = await fetch(`/api/patient/${fiscalCode}/records`, {
+      const recordsRes = await fetch(getApiUrl(`/api/patient/${fiscalCode}/records`), {
         credentials: 'include'
       })
       if (recordsRes.ok) {
@@ -357,7 +316,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
   const handleAddRecord = async (e) => {
     e.preventDefault()
     if (!foundPatient) {
-      setError('Seleziona un paziente')
+      setToast({ type: 'warning', message: 'Seleziona un paziente' })
       return
     }
 
@@ -383,7 +342,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
         formData.append('files', file)
       })
 
-      const res = await fetch(`/api/patient/${foundPatient.codice_fiscale}/add-record`, {
+      const res = await fetch(getApiUrl(`/api/patient/${foundPatient.codice_fiscale}/add-record`), {
         method: 'POST',
         credentials: 'include',
         body: formData
@@ -391,11 +350,17 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
 
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error || 'Errore nell\'aggiunta della scheda')
+        // Handle validation errors from backend
+        if (data.errors && Array.isArray(data.errors)) {
+          const errorMessages = data.errors.map(err => `${err.field}: ${err.message}`).join('\n')
+          setToast({ type: 'error', message: errorMessages })
+        } else {
+          setToast({ type: 'error', message: data.error || 'Errore nell\'aggiunta della scheda' })
+        }
         return
       }
 
-      alert('Scheda aggiunta con successo!')
+      setToast({ type: 'success', message: 'Scheda aggiunta con successo!' })
       setShowAddRecordForm(false)
       setRecordFormData({
         motivo_tipo: 'Visita',
@@ -411,7 +376,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
       setRecordFiles([])
 
       // Ricarica record
-      const recordsRes = await fetch(`/api/patient/${foundPatient.codice_fiscale}/records`, {
+      const recordsRes = await fetch(getApiUrl(`/api/patient/${foundPatient.codice_fiscale}/records`), {
         credentials: 'include'
       })
       if (recordsRes.ok) {
@@ -419,7 +384,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
         setClinicalRecords(recordsData.records || [])
       }
     } catch (err) {
-      setError('Errore di connessione: ' + err.message)
+      setToast({ type: 'error', message: 'Errore di connessione: ' + err.message })
     } finally {
       setLoading(false)
     }
@@ -467,7 +432,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
           if (foundPatient) {
             handleExport()
           } else {
-            setToast({ type: 'warning', message: 'Seleziona prima un paziente', icon: '⚠️' })
+            setToast({ type: 'warning', message: 'Seleziona prima un paziente' })
           }
         }} style={{
           flex: 1,
@@ -542,13 +507,13 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
           e.currentTarget.style.background = 'none'
           e.currentTarget.style.transform = 'translateY(0)'
         }}>
-        Nuovo Paziente
+          Nuovo Paziente
         </button>
         <button onClick={() => {
           if (foundPatient) {
             setShowAddRecordForm(true)
           } else {
-            setToast({ type: 'warning', message: 'Seleziona prima un paziente', icon: '⚠️' })
+            setToast({ type: 'warning', message: 'Seleziona prima un paziente' })
           }
         }} style={{
           flex: 1,
@@ -575,7 +540,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
           e.currentTarget.style.background = 'none'
           e.currentTarget.style.transform = 'translateY(0)'
         }}>
-        Nuova Scheda
+          Nuova Scheda
         </button>
       </nav>
 
@@ -606,7 +571,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                   )}
                   {foundPatient.malattie_permanenti && foundPatient.malattie_permanenti.length > 0 && (
                     <p style={{ color: '#dc2626', fontSize: '0.85rem' }}>
-                      ⚠️ Malattie: {foundPatient.malattie_permanenti.join(', ')}
+                      Malattie: {foundPatient.malattie_permanenti.join(', ')}
                     </p>
                   )}
                 </div>
@@ -794,7 +759,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                       setLoading(true)
                       try {
                         const fiscalCode = foundPatient.codice_fiscale || foundPatient.fiscal_code
-                        const res = await fetch(`/api/patient/${fiscalCode}/records/delete`, {
+                        const res = await fetch(getApiUrl(`/api/patient/${fiscalCode}/records/delete`), {
                           method: 'DELETE',
                           headers: { 'Content-Type': 'application/json' },
                           credentials: 'include',
@@ -812,7 +777,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                         setSelectedRecord(null)
                         
                         // Ricarica le schede cliniche
-                        const recordsRes = await fetch(`/api/patient/${fiscalCode}/records`, {
+                        const recordsRes = await fetch(getApiUrl(`/api/patient/${fiscalCode}/records`), {
                           credentials: 'include'
                         })
                         if (recordsRes.ok) {
@@ -932,7 +897,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                         alignItems: 'center',
                         gap: '0.25rem'
                       }}>
-                        ✅ Selezionata
+                        Selezionata
                       </div>
                     )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
@@ -948,7 +913,6 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                         style={{ flex: 1, paddingLeft: '2rem', cursor: 'pointer' }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                          <span style={{ fontSize: '1.2rem' }}>{record.motivo_tipo === 'Ricovero' ? '🛏️' : '🏥'}</span>
                           <p style={{ fontWeight: '600', margin: 0 }}>{record.motivo_tipo || record.tipo_scheda}</p>
                         </div>
                         {(record.motivo || record.chief_complaint) && (
@@ -1128,17 +1092,50 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div className="form-group">
+                <div className="form-group" style={{ position: 'relative' }}>
                   <label>Comune Nascita *</label>
-                  <input type="text" value={createFormData.comune_nascita} onChange={handleCreateFormChange} name="comune_nascita" required />
+                  <input 
+                    type="text" 
+                    value={createFormData.comune_nascita} 
+                    onChange={(e) => handleComuneInput(e.target.value)} 
+                    name="comune_nascita" 
+                    placeholder="Inizia a digitare il nome del comune..."
+                    required 
+                  />
+                  {showComuniList && comuniSuggest.length > 0 && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      backgroundColor: 'white',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      zIndex: 10,
+                      marginTop: '4px'
+                    }}>
+                      {comuniSuggest.map((comune, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => selectComune(comune)}
+                          style={{
+                            padding: '8px 12px',
+                            cursor: 'pointer',
+                            backgroundColor: idx % 2 === 0 ? '#f9f9f9' : 'white',
+                            borderBottom: '1px solid #eee',
+                            fontSize: '0.95rem'
+                          }}
+                          onMouseEnter={(e) => e.target.style.backgroundColor = '#e8f1ff'}
+                          onMouseLeave={(e) => e.target.style.backgroundColor = idx % 2 === 0 ? '#f9f9f9' : 'white'}
+                        >
+                          {comune.nome}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="form-group">
-                  <label>Codice ISTAT Comune * <span style={{ fontSize: '0.85rem', color: '#666' }}>(es: H501 per Roma, B191 per Brindisi)</span></label>
-                  <input type="text" value={createFormData.codice_istat_comune} onChange={handleCreateFormChange} name="codice_istat_comune" placeholder="A123" maxLength="4" required />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
                 <div className="form-group">
                   <label>Sesso *</label>
                   <div style={{ display: 'flex', gap: '1.5rem', paddingTop: '0.5rem' }}>
@@ -1154,10 +1151,19 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                 </div>
               </div>
 
-              <div className="form-group">
-                <label>Codice Fiscale *</label>
-                <input type="text" value={createFormData.codice_fiscale} readOnly placeholder="Calcolato automaticamente" maxLength="16" />
-              </div>
+              {calculatedCF && (
+                <div style={{
+                  backgroundColor: '#f0f4ff',
+                  border: '2px solid #1e3a8a',
+                  borderRadius: '8px',
+                  padding: '1rem',
+                  marginTop: '1.5rem',
+                  marginBottom: '1.5rem'
+                }}>
+                  <p style={{ margin: 0, fontSize: '0.9rem', color: '#6b7280', marginBottom: '0.5rem' }}>📋 Codice Fiscale (anteprima)</p>
+                  <p style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold', color: '#1e3a8a', fontFamily: 'monospace' }}>{calculatedCF}</p>
+                </div>
+              )}
 
               <h4 style={{ color: '#1e3a8a', marginTop: '1.5rem', marginBottom: '1rem', borderTop: '1px solid #e5e7eb', paddingTop: '1.5rem' }}>Informazioni Cliniche</h4>
 
