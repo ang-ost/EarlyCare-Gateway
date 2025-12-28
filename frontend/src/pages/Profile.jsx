@@ -52,7 +52,7 @@ export default function Profile({ user, onNavigate, onLogout }) {
   return (
     <>
       <header className="header">
-        <h1>Medical Access & Vision</h1>
+        <h1 style={{ cursor: 'pointer' }} onClick={() => onNavigate('dashboard')}>Medical Access & Vision</h1>
         <div className="header-actions">
           <div className="user-menu">
             <button className="menu-button" onClick={() => setShowMenu(!showMenu)}>
@@ -92,7 +92,7 @@ export default function Profile({ user, onNavigate, onLogout }) {
         <div className="card">
           <h3 style={{ color: '#dc2626' }}>Pericolo - Zona</h3>
           <p>L'eliminazione dell'account è irreversibile. Tutti i dati associati verranno cancellati.</p>
-          <button 
+          <button
             className="btn btn-danger"
             onClick={() => setShowDeleteModal(true)}
           >

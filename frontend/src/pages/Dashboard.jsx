@@ -439,7 +439,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
 
       <header className="header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-          <div>
+          <div style={{ cursor: 'pointer' }} onClick={() => onNavigate('dashboard')}>
             <h1 style={{ margin: 0, fontSize: '1.5rem' }}>Medical Access & Vision</h1>
           </div>
           <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
