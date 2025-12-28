@@ -719,7 +719,6 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                           onChange={(e) => setEditFormData({ ...editFormData, allergie: e.target.value })}
                           rows="2"
                           style={{ width: '100%', padding: '0.5rem', borderRadius: '0.25rem', border: '1px solid #d1d5db' }}
-                          placeholder=" con virgola"
                         ></textarea>
                       </div>
                       <div className="form-group" style={{ marginBottom: '1rem' }}>
@@ -729,7 +728,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                           onChange={(e) => setEditFormData({ ...editFormData, malattie_permanenti: e.target.value })}
                           rows="2"
                           style={{ width: '100%', padding: '0.5rem', borderRadius: '0.25rem', border: '1px solid #d1d5db' }}
-                          placeholder="Separare con virgola"
+
                         ></textarea>
                       </div>
                       <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
@@ -1381,7 +1380,6 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                     value={createFormData.comune_nascita}
                     onChange={(e) => handleComuneInput(e.target.value)}
                     name="comune_nascita"
-                    placeholder={createFormData.is_foreign ? "Inserisci città o stato..." : "Inizia a digitare il nome del comune..."}
                     required={!createFormData.is_foreign}
                   />
                   {showComuniList && comuniSuggest.length > 0 && !createFormData.is_foreign && (
@@ -1465,12 +1463,12 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
 
               <div className="form-group">
                 <label>Allergie</label>
-                <textarea value={createFormData.allergie} onChange={(e) => setCreateFormData({ ...createFormData, allergie: e.target.value })} placeholder="Separare con virgola o punto e virgola" rows="2"></textarea>
+                <textarea value={createFormData.allergie} onChange={(e) => setCreateFormData({ ...createFormData, allergie: e.target.value })} rows="2"></textarea>
               </div>
 
               <div className="form-group">
                 <label>Malattie Permanenti</label>
-                <textarea value={createFormData.malattie_permanenti} onChange={(e) => setCreateFormData({ ...createFormData, malattie_permanenti: e.target.value })} placeholder="Separare con virgola o punto e virgola" rows="2"></textarea>
+                <textarea value={createFormData.malattie_permanenti} onChange={(e) => setCreateFormData({ ...createFormData, malattie_permanenti: e.target.value })} rows="2"></textarea>
               </div>
 
               <div className="modal-buttons">
