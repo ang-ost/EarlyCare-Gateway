@@ -560,7 +560,7 @@ def create_patient():
         # Check if patient already exists
         existing = db.find_by_fiscal_code(data['codice_fiscale'].upper())
         if existing:
-            return jsonify({'error': 'Paziente già esistente con questo codice fiscale'}), 400
+            return jsonify({'error': 'Paziente già esistente'}), 400
         
         # Get gender from form data or determine from codice fiscale
         codice_fiscale = data['codice_fiscale'].upper()

@@ -252,6 +252,12 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
     setLoading(true)
 
     try {
+      if (!calculatedCF || calculatedCF.startsWith('⚠️')) {
+        setToast({ type: 'error', message: 'Codice fiscale non valido o non calcolato' })
+        setLoading(false)
+        return
+      }
+
       const res = await fetch(getApiUrl('/api/patient/create'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -259,6 +265,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
         body: JSON.stringify({
           nome: createFormData.nome,
           cognome: createFormData.cognome,
+          codice_fiscale: calculatedCF,
           data_nascita: createFormData.data_nascita,
           data_decesso: createFormData.data_decesso || undefined,
           comune_nascita: createFormData.comune_nascita,
