@@ -774,6 +774,7 @@ def add_clinical_record(fiscal_code):
             'symptoms': data.get('symptoms', ''),
             'diagnosis': data.get('diagnosis', ''),
             'treatment': data.get('treatment', ''),
+            'priority': data.get('priority', 'routine'),
             'notes': data.get('notes', ''),
             'vital_signs': vital_signs,
             'attachments': attachments,
@@ -1162,11 +1163,21 @@ def export_patient_data(fiscal_code):
                 story.append(Paragraph(record_title, styles['Heading3']))
                 
                 # Record details
+                # Translate priority
+                priority_map = {
+                    'routine': 'Routine',
+                    'soon': 'Presto',
+                    'urgent': 'Urgente',
+                    'emergency': 'Emergenza'
+                }
+                priority_val = record.get('priority', 'routine')
+                priority_display = priority_map.get(priority_val, priority_val)
+                
                 record_data = [
                     ['ID Incontro:', str(record.get('encounter_id', 'N/A'))],
                     ['Motivo Principale:', record.get('chief_complaint', 'N/A')],
                     ['Sintomi:', record.get('symptoms', 'N/A')],
-                    ['Priorità:', record.get('priority', 'N/A')],
+                    ['Priorità:', priority_display],
                 ]
                 
                 # Add vital signs if available

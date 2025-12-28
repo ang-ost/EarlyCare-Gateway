@@ -45,6 +45,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
   const [recordFormData, setRecordFormData] = useState({
     motivo_tipo: 'Visita',
     motivo: 'Visita di Controllo',
+    priority: 'routine',
     symptoms: '',
     notes: '',
     blood_pressure: '',
@@ -370,6 +371,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
       const formData = new FormData()
       formData.append('motivo_tipo', recordFormData.motivo_tipo)
       formData.append('motivo', recordFormData.motivo)
+      formData.append('priority', recordFormData.priority)
       formData.append('symptoms', recordFormData.symptoms)
       formData.append('notes', recordFormData.notes)
       formData.append('vital_signs', JSON.stringify({
@@ -408,6 +410,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
       setRecordFormData({
         motivo_tipo: 'Visita',
         motivo: 'Visita di Controllo',
+        priority: 'routine',
         symptoms: '',
         notes: '',
         blood_pressure: '',
@@ -966,6 +969,33 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
                           <p style={{ fontWeight: '600', margin: 0 }}>{record.motivo_tipo || record.tipo_scheda}</p>
+                          {record.priority && (
+                            <span style={{
+                              fontSize: '0.75rem',
+                              padding: '0.1rem 0.5rem',
+                              borderRadius: '9999px',
+                              fontWeight: '500',
+                              backgroundColor: {
+                                'routine': '#dcfce7',
+                                'soon': '#fef9c3',
+                                'urgent': '#ffedd5',
+                                'emergency': '#fee2e2'
+                              }[record.priority] || '#f3f4f6',
+                              color: {
+                                'routine': '#166534',
+                                'soon': '#854d0e',
+                                'urgent': '#9a3412',
+                                'emergency': '#991b1b'
+                              }[record.priority] || '#374151'
+                            }}>
+                              {{
+                                'routine': '🟢 Routine',
+                                'soon': '🟡 Presto',
+                                'urgent': '🟠 Urgente',
+                                'emergency': '🔴 Emergenza'
+                              }[record.priority] || record.priority}
+                            </span>
+                          )}
                         </div>
                         {(record.motivo || record.chief_complaint) && (
                           <p style={{ fontSize: '0.9rem', color: '#374151', margin: '0.25rem 0', fontStyle: 'italic' }}>
@@ -1314,6 +1344,20 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                 }} required style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', borderRadius: '8px', border: '2px solid #e5e7eb' }}>
                   <option value="Visita">🏥 Visita</option>
                   <option value="Ricovero">🛏️ Ricovero</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Priorità</label>
+                <select
+                  value={recordFormData.priority}
+                  onChange={(e) => setRecordFormData({ ...recordFormData, priority: e.target.value })}
+                  style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', borderRadius: '8px', border: '2px solid #e5e7eb' }}
+                >
+                  <option value="routine">🟢 Routine</option>
+                  <option value="soon">🟡 Presto</option>
+                  <option value="urgent">🟠 Urgente</option>
+                  <option value="emergency">🔴 Emergenza</option>
                 </select>
               </div>
 
