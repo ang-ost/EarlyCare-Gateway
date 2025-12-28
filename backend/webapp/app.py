@@ -16,7 +16,7 @@ import io
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image as RLImage
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 import PyPDF2
@@ -1013,7 +1013,7 @@ def get_metrics():
     return jsonify({'error': 'Metrics observer non disponibile'}), 500
 
 
-@app.route('/api/export/<fiscal_code>', methods=['GET'])
+@app.route('/api/export/<fiscal_code>', methods=['GET', 'POST'])
 @require_login
 def export_patient_data(fiscal_code):
     """Export patient data and clinical records as PDF file."""
@@ -1026,19 +1026,21 @@ def export_patient_data(fiscal_code):
         if not patient_data:
             return jsonify({'error': 'Paziente non trovato'}), 404
         
-        print(f"DEBUG: Patient data keys: {list(patient_data.keys())}")
-        print(f"DEBUG: Comune Nascita (luogo_nascita): '{patient_data.get('luogo_nascita')}'")
-        print(f"DEBUG: Gender (sesso): '{patient_data.get('sesso')}'")
-        print(f"DEBUG: Age: '{patient_data.get('age')}'")
-        print(f"DEBUG: Data nascita: '{patient_data.get('data_nascita')}'")
+        # Get selected record indexes if POST request
+        selected_indexes = None
+        if request.method == 'POST':
+            data = request.json
+            selected_indexes = data.get('indexes', [])
         
         # Get clinical records
         clinical_records = []
         try:
-            clinical_records = db.get_patient_clinical_records(fiscal_code)
-            print(f"DEBUG: Found {len(clinical_records)} clinical records")
-            if clinical_records:
-                print(f"DEBUG: First record keys: {list(clinical_records[0].keys())}")
+            all_records = db.get_patient_clinical_records(fiscal_code)
+            
+            if selected_indexes is not None and len(selected_indexes) > 0:
+                clinical_records = [all_records[i] for i in selected_indexes if i < len(all_records)]
+            else:
+                clinical_records = all_records
         except Exception as e:
             print(f"Warning: Could not load clinical records: {e}")
         
@@ -1202,18 +1204,54 @@ def export_patient_data(fiscal_code):
                         notes_text = ', '.join(str(n) for n in notes_text)
                     story.append(Paragraph(str(notes_text), styles['Normal']))
                 
-                # Add attachments list if available
+                # Add attachments if available
                 attachments = record.get('attachments', [])
                 if attachments:
                     story.append(Spacer(1, 0.3*cm))
                     story.append(Paragraph('<b>Allegati:</b>', styles['Normal']))
+                    story.append(Spacer(1, 0.2*cm))
+                    
                     for att in attachments:
                         att_name = att.get('name', 'N/A')
-                        att_size = att.get('size', 0)
                         att_type = att.get('type', 'N/A')
+                        att_size = att.get('size', 0)
+                        att_content = att.get('content', '')
+                        
                         size_kb = round(att_size / 1024, 2) if att_size else 0
-                        att_text = f"📎 {att_name} ({size_kb} KB, {att_type})"
-                        story.append(Paragraph(att_text, styles['Normal']))
+                        
+                        if att_content and att_type and att_type.startswith('image/'):
+                            try:
+                                import base64
+                                
+                                img_data = base64.b64decode(att_content)
+                                img_buffer = io.BytesIO(img_data)
+                                
+                                img = RLImage(img_buffer)
+                                
+                                max_width = 14*cm
+                                max_height = 18*cm
+                                
+                                aspect_ratio = img.drawWidth / img.drawHeight
+                                
+                                if img.drawWidth > max_width:
+                                    img.drawWidth = max_width
+                                    img.drawHeight = max_width / aspect_ratio
+                                
+                                if img.drawHeight > max_height:
+                                    img.drawHeight = max_height
+                                    img.drawWidth = max_height * aspect_ratio
+                                
+                                story.append(Paragraph(f'<b>{att_name}</b>', styles['Normal']))
+                                story.append(Spacer(1, 0.2*cm))
+                                story.append(img)
+                                story.append(Spacer(1, 0.3*cm))
+                            except Exception as e:
+                                print(f"Errore nel processare immagine {att_name}: {e}")
+                                att_text = f"📎 {att_name} ({att_type})"
+                                story.append(Paragraph(att_text, styles['Normal']))
+                        else:
+                            att_text = f"📎 {att_name} ({att_type})"
+                            story.append(Paragraph(att_text, styles['Normal']))
                 
                 story.append(Spacer(1, 0.5*cm))
         else:
@@ -1237,42 +1275,8 @@ def export_patient_data(fiscal_code):
         # Build PDF
         doc.build(story)
         
-        # Add attachments as PDF metadata
-        if any(record.get('attachments') for record in clinical_records):
-            import json
-            import base64
-            from PyPDF2 import PdfReader, PdfWriter
-            
-            # Read the generated PDF
-            memory_file.seek(0)
-            reader = PdfReader(memory_file)
-            writer = PdfWriter()
-            
-            # Copy all pages
-            for page in reader.pages:
-                writer.add_page(page)
-            
-            # Prepare attachments data
-            attachments_data = {}
-            for idx, record in enumerate(clinical_records, 1):
-                if record.get('attachments'):
-                    attachments_data[f"record_{idx}"] = record['attachments']
-            
-            # Add as custom metadata
-            if attachments_data:
-                json_data = json.dumps(attachments_data, ensure_ascii=False)
-                writer.add_metadata({
-                    '/EarlyCareAttachments': base64.b64encode(json_data.encode('utf-8')).decode('ascii')
-                })
-            
-            # Write to new memory file
-            output_file = io.BytesIO()
-            writer.write(output_file)
-            output_file.seek(0)
-            memory_file = output_file
-        else:
-            # Seek to beginning of file
-            memory_file.seek(0)
+        # Seek to beginning of file
+        memory_file.seek(0)
         
         # Generate filename
         filename = f"cartella_clinica_{fiscal_code}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"

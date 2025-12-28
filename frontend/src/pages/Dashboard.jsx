@@ -10,7 +10,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
   const [showAddRecordForm, setShowAddRecordForm] = useState(false)
   const [showPatientSearch, setShowPatientSearch] = useState(false)
   const [showDiagnosisModal, setShowDiagnosisModal] = useState(false)
-  
+
   const [searchFiscalCode, setSearchFiscalCode] = useState('')
   const [foundPatient, setFoundPatient] = useState(null)
   const [clinicalRecords, setClinicalRecords] = useState([])
@@ -20,7 +20,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [toast, setToast] = useState(null)
-  
+
   const [createFormData, setCreateFormData] = useState({
     nome: '',
     cognome: '',
@@ -62,7 +62,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
     setCreateFormData(updatedData)
 
     if (value.length > 0) {
-      const filtered = comuni.filter(c => 
+      const filtered = comuni.filter(c =>
         c.nome.toUpperCase().startsWith(value.toUpperCase())
       ).slice(0, 10) // Mostra solo i primi 10
       setComuniSuggest(filtered)
@@ -94,9 +94,21 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
 
     try {
       const fiscalCode = foundPatient.codice_fiscale || foundPatient.fiscal_code
-      const res = await fetch(getApiUrl(`/api/export/${fiscalCode}`), {
-        credentials: 'include'
-      })
+
+      let url = getApiUrl(`/api/export/${fiscalCode}`)
+      let options = { credentials: 'include' }
+
+      if (selectedRecords.length > 0) {
+        url = getApiUrl(`/api/export/${fiscalCode}`)
+        options = {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ indexes: selectedRecords })
+        }
+      }
+
+      const res = await fetch(url, options)
 
       if (!res.ok) {
         const errorData = await res.json()
@@ -104,18 +116,23 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
         return
       }
 
-      // Download file
       const blob = await res.blob()
-      const url = window.URL.createObjectURL(blob)
+      const downloadUrl = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = url
-      a.download = `cartella_clinica_${fiscalCode}_${new Date().toISOString().slice(0,10)}.pdf`
+      a.href = downloadUrl
+      const fileName = selectedRecords.length > 0
+        ? `schede_cliniche_${fiscalCode}_${new Date().toISOString().slice(0, 10)}.pdf`
+        : `cartella_clinica_${fiscalCode}_${new Date().toISOString().slice(0, 10)}.pdf`
+      a.download = fileName
       document.body.appendChild(a)
       a.click()
-      window.URL.revokeObjectURL(url)
+      window.URL.revokeObjectURL(downloadUrl)
       document.body.removeChild(a)
 
-      setToast({ type: 'success', message: 'Cartella clinica esportata con successo' })
+      const message = selectedRecords.length > 0
+        ? `${selectedRecords.length} scheda/e esportata/e con successo`
+        : 'Cartella clinica esportata con successo'
+      setToast({ type: 'success', message })
     } catch (err) {
       setToast({ type: 'error', message: 'Errore di connessione' })
     }
@@ -185,7 +202,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
       if (data.patient) {
         setFoundPatient(data.patient)
         setShowPatientSearch(false)
-        
+
         // Carica record
         const recordsRes = await fetch(getApiUrl(`/api/patient/${searchFiscalCode.trim().toUpperCase()}/records`), {
           credentials: 'include'
@@ -271,7 +288,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
     try {
       const formData = new FormData()
       formData.append('fiscal_code', foundPatient.codice_fiscale || foundPatient.fiscal_code)
-      
+
       files.forEach((file) => {
         formData.append('files[]', file)
       })
@@ -293,7 +310,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
       if (data.diagnosis && data.confidence) {
         successMessage += ` | Diagnosi: ${data.diagnosis} (${(data.confidence * 100).toFixed(0)}%)`
       }
-      
+
       setToast({ type: 'success', message: successMessage, icon: '✅' })
       setUploadedFiles([])
 
@@ -336,7 +353,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
         oxygen_saturation: recordFormData.oxygen_saturation,
         respiratory_rate: recordFormData.respiratory_rate
       }))
-      
+
       // Aggiungi file
       recordFiles.forEach((file) => {
         formData.append('files', file)
@@ -393,7 +410,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
   return (
     <>
       {toast && <Toast type={toast.type} message={toast.message} icon={toast.icon} onClose={() => setToast(null)} />}
-      
+
       <header className="header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
           <div>
@@ -547,7 +564,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
       <div className="container">
         {/* Two Panel Layout */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', margin: '2rem 0' }}>
-          
+
           {/* Left Panel */}
           <div className="card">
             <h3 style={{ marginTop: 0, color: '#1e3a8a' }}>📋 Cartella Clinica</h3>
@@ -584,7 +601,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
             {/* File Upload Section */}
             <div>
               <h4 style={{ marginBottom: '1rem' }}>📤 Carica File Clinici</h4>
-              <div 
+              <div
                 style={{
                   border: `2px dashed ${isDragging ? '#764ba2' : '#667eea'}`,
                   borderRadius: '0.5rem',
@@ -617,21 +634,21 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                   const files = Array.from(e.dataTransfer.files)
                   const pdfFiles = files.filter(file => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'))
                   const rejectedCount = files.length - pdfFiles.length
-                  
+
                   if (pdfFiles.length > 0) {
                     setUploadedFiles(prev => [...prev, ...pdfFiles])
                     setToast({ type: 'success', message: `${pdfFiles.length} file PDF aggiunti`, icon: '✅' })
                   }
-                  
+
                   if (rejectedCount > 0) {
                     setToast({ type: 'warning', message: `${rejectedCount} file ignorati (solo PDF accettati)`, icon: '⚠️' })
                   }
                 }}
                 onClick={() => document.getElementById('fileUploadInput').click()}
               >
-                <input 
+                <input
                   id="fileUploadInput"
-                  type="file" 
+                  type="file"
                   multiple
                   accept=".pdf,application/pdf"
                   onChange={(e) => {
@@ -652,18 +669,18 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                   Solo file PDF esportati dalla piattaforma
                 </p>
               </div>
-              
+
               {uploadedFiles.length > 0 && (
                 <div style={{ marginTop: '1rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                     <p style={{ fontWeight: '600', color: '#667eea' }}>📎 File caricati ({uploadedFiles.length})</p>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button 
+                      <button
                         onClick={() => handleUploadFiles(uploadedFiles)}
                         className="btn btn-primary"
                         disabled={loading}
                         style={{
-                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          background: 'linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%)',
                           border: 'none',
                           color: 'white',
                           cursor: loading ? 'not-allowed' : 'pointer',
@@ -676,7 +693,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                       >
                         {loading ? '⏳ Elaborazione...' : '🔄 Converti e Carica'}
                       </button>
-                      <button 
+                      <button
                         onClick={() => setUploadedFiles([])}
                         style={{
                           background: 'transparent',
@@ -691,9 +708,9 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                       </button>
                     </div>
                   </div>
-                  <div style={{ 
-                    display: 'flex', 
-                    flexDirection: 'column', 
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
                     gap: '0.5rem',
                     maxHeight: '200px',
                     overflowY: 'auto',
@@ -703,9 +720,9 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                     background: '#f9fafb'
                   }}>
                     {uploadedFiles.map((file, idx) => (
-                      <div key={idx} style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
+                      <div key={idx} style={{
+                        display: 'flex',
+                        alignItems: 'center',
                         justifyContent: 'space-between',
                         gap: '0.5rem',
                         padding: '0.5rem',
@@ -755,7 +772,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                       if (!confirm(`Sei sicuro di voler eliminare ${selectedRecords.length} scheda/e clinica/che?`)) {
                         return
                       }
-                      
+
                       setLoading(true)
                       try {
                         const fiscalCode = foundPatient.codice_fiscale || foundPatient.fiscal_code
@@ -765,17 +782,17 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                           credentials: 'include',
                           body: JSON.stringify({ indexes: selectedRecords })
                         })
-                        
+
                         const data = await res.json()
                         if (!res.ok) {
                           setToast({ type: 'error', message: data.error || 'Errore nell\'eliminazione', icon: '❌' })
                           return
                         }
-                        
+
                         setToast({ type: 'success', message: `${selectedRecords.length} scheda/e eliminata/e con successo`, icon: '✅' })
                         setSelectedRecords([])
                         setSelectedRecord(null)
-                        
+
                         // Ricarica le schede cliniche
                         const recordsRes = await fetch(getApiUrl(`/api/patient/${fiscalCode}/records`), {
                           credentials: 'include'
@@ -853,7 +870,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                     }}
                   >
                     {/* Checkbox per selezione multipla */}
-                    <div 
+                    <div
                       style={{
                         position: 'absolute',
                         top: '0.5rem',
@@ -881,7 +898,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                         }}
                       />
                     </div>
-                    
+
                     {selectedRecord === idx && (
                       <div style={{
                         position: 'absolute',
@@ -901,7 +918,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                       </div>
                     )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                      <div 
+                      <div
                         onClick={(e) => {
                           // Clicco sul contenuto per selezionare la scheda
                           if (selectedRecord === idx) {
@@ -959,7 +976,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                             <p style={{ margin: 0, lineHeight: '1.6' }}>{record.symptoms}</p>
                           </div>
                         )}
-                        
+
                         {record.vital_signs && Object.keys(record.vital_signs).length > 0 && (
                           <div style={{ marginBottom: '1rem' }}>
                             <p style={{ fontWeight: '600', color: '#1e3a8a', marginBottom: '0.5rem' }}>Parametri Vitali:</p>
@@ -978,17 +995,69 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                             <p style={{ fontWeight: '600', color: '#1e3a8a', marginBottom: '0.5rem' }}>Allegati:</p>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                               {record.attachments.map((file, fileIdx) => (
-                                <div key={fileIdx} style={{
-                                  padding: '0.25rem 0.75rem',
-                                  background: '#f0f9ff',
-                                  borderRadius: '0.25rem',
-                                  fontSize: '0.85rem',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.25rem'
-                                }}>
+                                <div
+                                  key={fileIdx}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (file.content) {
+                                      try {
+                                        const byteCharacters = atob(file.content)
+                                        const byteNumbers = new Array(byteCharacters.length)
+                                        for (let i = 0; i < byteCharacters.length; i++) {
+                                          byteNumbers[i] = byteCharacters.charCodeAt(i)
+                                        }
+                                        const byteArray = new Uint8Array(byteNumbers)
+                                        const blob = new Blob([byteArray], { type: file.type || 'application/octet-stream' })
+                                        const url = URL.createObjectURL(blob)
+
+                                        if (file.type && file.type.startsWith('image/')) {
+                                          window.open(url, '_blank')
+                                        } else if (file.type === 'application/pdf') {
+                                          window.open(url, '_blank')
+                                        } else {
+                                          const a = document.createElement('a')
+                                          a.href = url
+                                          a.download = file.name || 'file'
+                                          document.body.appendChild(a)
+                                          a.click()
+                                          document.body.removeChild(a)
+                                        }
+
+                                        setTimeout(() => URL.revokeObjectURL(url), 100)
+                                      } catch (error) {
+                                        console.error('Errore apertura file:', error)
+                                        setToast({ type: 'error', message: 'Errore nell\'apertura del file' })
+                                      }
+                                    }
+                                  }}
+                                  style={{
+                                    padding: '0.25rem 0.75rem',
+                                    background: '#f0f9ff',
+                                    borderRadius: '0.25rem',
+                                    fontSize: '0.85rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem',
+                                    cursor: file.content ? 'pointer' : 'default',
+                                    transition: 'all 0.2s',
+                                    border: '1px solid transparent'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    if (file.content) {
+                                      e.currentTarget.style.background = '#dbeafe'
+                                      e.currentTarget.style.borderColor = '#3b82f6'
+                                      e.currentTarget.style.transform = 'translateY(-1px)'
+                                    }
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = '#f0f9ff'
+                                    e.currentTarget.style.borderColor = 'transparent'
+                                    e.currentTarget.style.transform = 'translateY(0)'
+                                  }}
+                                >
                                   <span>📄</span>
-                                  <span>{file.name || file}</span>
+                                  <span style={{ color: file.content ? '#1e40af' : '#6b7280' }}>{file.name || file}</span>
+                                  {file.content && <span style={{ fontSize: '0.7rem', color: '#3b82f6' }}>↗</span>}
                                 </div>
                               ))}
                             </div>
@@ -1010,7 +1079,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                             <p style={{ margin: 0 }}>{record.diagnosis}</p>
                           </div>
                         )}
-                        
+
                         {record.treatment && (
                           <div style={{ marginTop: '1rem' }}>
                             <p style={{ fontWeight: '600', color: '#1e3a8a', marginBottom: '0.25rem' }}>Trattamento:</p>
@@ -1065,10 +1134,10 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
             <h3>Nuovo Paziente</h3>
             {error && <div className="alert alert-danger">{error}</div>}
-            
+
             <form onSubmit={handleCreatePatient}>
               <h4 style={{ color: '#1e3a8a', marginTop: '1.5rem', marginBottom: '1rem' }}>Dati Anagrafici</h4>
-              
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
                   <label>Nome *</label>
@@ -1094,13 +1163,13 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group" style={{ position: 'relative' }}>
                   <label>Comune Nascita *</label>
-                  <input 
-                    type="text" 
-                    value={createFormData.comune_nascita} 
-                    onChange={(e) => handleComuneInput(e.target.value)} 
-                    name="comune_nascita" 
+                  <input
+                    type="text"
+                    value={createFormData.comune_nascita}
+                    onChange={(e) => handleComuneInput(e.target.value)}
+                    name="comune_nascita"
                     placeholder="Inizia a digitare il nome del comune..."
-                    required 
+                    required
                   />
                   {showComuniList && comuniSuggest.length > 0 && (
                     <div style={{
@@ -1169,12 +1238,12 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
 
               <div className="form-group">
                 <label>Allergie</label>
-                <textarea value={createFormData.allergie} onChange={(e) => setCreateFormData({...createFormData, allergie: e.target.value})} placeholder="Separare con virgola o punto e virgola" rows="2"></textarea>
+                <textarea value={createFormData.allergie} onChange={(e) => setCreateFormData({ ...createFormData, allergie: e.target.value })} placeholder="Separare con virgola o punto e virgola" rows="2"></textarea>
               </div>
 
               <div className="form-group">
                 <label>Malattie Permanenti</label>
-                <textarea value={createFormData.malattie_permanenti} onChange={(e) => setCreateFormData({...createFormData, malattie_permanenti: e.target.value})} placeholder="Separare con virgola o punto e virgola" rows="2"></textarea>
+                <textarea value={createFormData.malattie_permanenti} onChange={(e) => setCreateFormData({ ...createFormData, malattie_permanenti: e.target.value })} placeholder="Separare con virgola o punto e virgola" rows="2"></textarea>
               </div>
 
               <div className="modal-buttons">
@@ -1197,13 +1266,13 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
             <h3>📄 Aggiungi Scheda Clinica</h3>
             <p style={{ color: '#6b7280', marginBottom: '1rem' }}>Paziente: <strong>{foundPatient.nome} {foundPatient.cognome}</strong></p>
             {error && <div className="alert alert-danger">{error}</div>}
-            
+
             <form onSubmit={handleAddRecord}>
               <div className="form-group">
                 <select value={recordFormData.motivo_tipo} onChange={(e) => {
                   const tipo = e.target.value
                   setRecordFormData({
-                    ...recordFormData, 
+                    ...recordFormData,
                     motivo_tipo: tipo,
                     motivo: tipo === 'Visita' ? 'Visita di Controllo' : 'Ricovero Ospedaliero'
                   })
@@ -1215,11 +1284,11 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
 
               <div className="form-group">
                 <label>Sintomi *</label>
-                <textarea 
-                  value={recordFormData.symptoms} 
-                  onChange={(e) => setRecordFormData({...recordFormData, symptoms: e.target.value})} 
+                <textarea
+                  value={recordFormData.symptoms}
+                  onChange={(e) => setRecordFormData({ ...recordFormData, symptoms: e.target.value })}
                   placeholder="Descrizione dettagliata dei sintomi presentati dal paziente..."
-                  required 
+                  required
                   rows="4"
                 ></textarea>
               </div>
@@ -1229,55 +1298,55 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
                   <label>Pressione Arteriosa</label>
-                  <input 
-                    type="text" 
-                    value={recordFormData.blood_pressure} 
-                    onChange={(e) => setRecordFormData({...recordFormData, blood_pressure: e.target.value})} 
-                    placeholder="120/80 mmHg" 
+                  <input
+                    type="text"
+                    value={recordFormData.blood_pressure}
+                    onChange={(e) => setRecordFormData({ ...recordFormData, blood_pressure: e.target.value })}
+                    placeholder="120/80 mmHg"
                   />
                 </div>
                 <div className="form-group">
                   <label>Frequenza Cardiaca</label>
-                  <input 
-                    type="text" 
-                    value={recordFormData.heart_rate} 
-                    onChange={(e) => setRecordFormData({...recordFormData, heart_rate: e.target.value})} 
-                    placeholder="75 bpm" 
+                  <input
+                    type="text"
+                    value={recordFormData.heart_rate}
+                    onChange={(e) => setRecordFormData({ ...recordFormData, heart_rate: e.target.value })}
+                    placeholder="75 bpm"
                   />
                 </div>
                 <div className="form-group">
                   <label>Temperatura</label>
-                  <input 
-                    type="text" 
-                    value={recordFormData.temperature} 
-                    onChange={(e) => setRecordFormData({...recordFormData, temperature: e.target.value})} 
-                    placeholder="36.5 °C" 
+                  <input
+                    type="text"
+                    value={recordFormData.temperature}
+                    onChange={(e) => setRecordFormData({ ...recordFormData, temperature: e.target.value })}
+                    placeholder="36.5 °C"
                   />
                 </div>
                 <div className="form-group">
                   <label>Saturazione O2</label>
-                  <input 
-                    type="text" 
-                    value={recordFormData.oxygen_saturation} 
-                    onChange={(e) => setRecordFormData({...recordFormData, oxygen_saturation: e.target.value})} 
-                    placeholder="98%" 
+                  <input
+                    type="text"
+                    value={recordFormData.oxygen_saturation}
+                    onChange={(e) => setRecordFormData({ ...recordFormData, oxygen_saturation: e.target.value })}
+                    placeholder="98%"
                   />
                 </div>
                 <div className="form-group">
                   <label>Frequenza Respiratoria</label>
-                  <input 
-                    type="text" 
-                    value={recordFormData.respiratory_rate} 
-                    onChange={(e) => setRecordFormData({...recordFormData, respiratory_rate: e.target.value})} 
-                    placeholder="16 atti/min" 
+                  <input
+                    type="text"
+                    value={recordFormData.respiratory_rate}
+                    onChange={(e) => setRecordFormData({ ...recordFormData, respiratory_rate: e.target.value })}
+                    placeholder="16 atti/min"
                   />
                 </div>
               </div>
 
               <div className="form-group" style={{ marginTop: '1.5rem' }}>
                 <label>Allega Documenti</label>
-                <input 
-                  type="file" 
+                <input
+                  type="file"
                   multiple
                   accept=".txt,.pdf,.json,.jpg,.jpeg,.png"
                   onChange={(e) => setRecordFiles(Array.from(e.target.files))}
@@ -1296,9 +1365,9 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                 {recordFiles.length > 0 && (
                   <div style={{ marginTop: '0.5rem' }}>
                     {recordFiles.map((file, idx) => (
-                      <div key={idx} style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
+                      <div key={idx} style={{
+                        display: 'flex',
+                        alignItems: 'center',
                         gap: '0.5rem',
                         padding: '0.25rem 0',
                         fontSize: '0.9rem',
@@ -1315,9 +1384,9 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
 
               <div className="form-group">
                 <label>Note del Medico</label>
-                <textarea 
-                  value={recordFormData.notes} 
-                  onChange={(e) => setRecordFormData({...recordFormData, notes: e.target.value})} 
+                <textarea
+                  value={recordFormData.notes}
+                  onChange={(e) => setRecordFormData({ ...recordFormData, notes: e.target.value })}
                   placeholder="Annotazioni, osservazioni o intuizioni del medico riguardo al caso..."
                   rows="4"
                   style={{ fontFamily: 'monospace', fontSize: '0.95rem' }}
@@ -1339,7 +1408,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
 
       {/* AI Diagnosis Modal */}
       {showDiagnosisModal && foundPatient && (
-        <DiagnosisModal 
+        <DiagnosisModal
           patient={foundPatient}
           selectedRecord={selectedRecord !== null ? clinicalRecords[selectedRecord] : null}
           onClose={() => {
