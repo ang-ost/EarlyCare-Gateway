@@ -28,6 +28,7 @@ pnpm-debug.log*
 
 # Environment variables (IMPORTANT: Never commit credentials!)
 .env
+
 .env.local
 .env.*.local
 
