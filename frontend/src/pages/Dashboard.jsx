@@ -62,6 +62,11 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
   const [comuniSuggest, setComuniSuggest] = useState([])
   const [showComuniList, setShowComuniList] = useState(false)
   const [calculatedCF, setCalculatedCF] = useState('')
+  const [isEditingInfo, setIsEditingInfo] = useState(false)
+  const [editFormData, setEditFormData] = useState({
+    allergie: '',
+    malattie_permanenti: ''
+  })
 
   // Persist patient data to sessionStorage
   useEffect(() => {
@@ -462,6 +467,44 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
     }
   }
 
+  const handleStartEdit = () => {
+    setEditFormData({
+      allergie: foundPatient.allergie ? (Array.isArray(foundPatient.allergie) ? foundPatient.allergie.join(', ') : foundPatient.allergie) : '',
+      malattie_permanenti: foundPatient.malattie_permanenti ? (Array.isArray(foundPatient.malattie_permanenti) ? foundPatient.malattie_permanenti.join(', ') : foundPatient.malattie_permanenti) : ''
+    })
+    setIsEditingInfo(true)
+  }
+
+  const handleUpdatePatient = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(getApiUrl('/api/patient/update'), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          codice_fiscale: foundPatient.codice_fiscale,
+          allergie: editFormData.allergie,
+          malattie_permanenti: editFormData.malattie_permanenti
+        })
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        setToast({ type: 'error', message: data.error || 'Errore aggiornamento' })
+        return
+      }
+
+      setFoundPatient(data.patient)
+      setToast({ type: 'success', message: 'Dati aggiornati con successo' })
+      setIsEditingInfo(false)
+    } catch (err) {
+      setToast({ type: 'error', message: 'Errore di connessione' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <>
       {toast && <Toast type={toast.type} message={toast.message} icon={toast.icon} onClose={() => setToast(null)} />}
@@ -626,7 +669,23 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
 
             {/* Patient Info Section */}
             <div style={{ marginBottom: '2rem', paddingBottom: '1.5rem', borderBottom: '1px solid #e5e7eb' }}>
-              <h4 style={{ marginBottom: '1rem' }}>Informazioni Paziente</h4>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h4 style={{ margin: 0 }}>Informazioni Paziente</h4>
+                {foundPatient && !isEditingInfo && (
+                  <button
+                    onClick={handleStartEdit}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#667eea',
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                    }}
+                  >
+                    Modifica
+                  </button>
+                )}
+              </div>
               {foundPatient ? (
                 <div style={{ background: '#f3f4f6', padding: '1rem', borderRadius: '0.5rem' }}>
                   <p><strong>{foundPatient.nome} {foundPatient.cognome}</strong></p>
@@ -650,10 +709,60 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                   {foundPatient.age && (
                     <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: '0.25rem 0' }}>Età: {foundPatient.age} anni</p>
                   )}
-                  {foundPatient.malattie_permanenti && foundPatient.malattie_permanenti.length > 0 && (
-                    <p style={{ color: '#dc2626', fontSize: '0.85rem' }}>
-                      Malattie: {foundPatient.malattie_permanenti.join(', ')}
-                    </p>
+
+                  {isEditingInfo ? (
+                    <div style={{ marginTop: '1rem', borderTop: '1px solid #e5e7eb', paddingTop: '1rem' }}>
+                      <div className="form-group" style={{ marginBottom: '1rem' }}>
+                        <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#374151' }}>Allergie</label>
+                        <textarea
+                          value={editFormData.allergie}
+                          onChange={(e) => setEditFormData({ ...editFormData, allergie: e.target.value })}
+                          rows="2"
+                          style={{ width: '100%', padding: '0.5rem', borderRadius: '0.25rem', border: '1px solid #d1d5db' }}
+                          placeholder="Separare con virgola"
+                        ></textarea>
+                      </div>
+                      <div className="form-group" style={{ marginBottom: '1rem' }}>
+                        <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#374151' }}>Malattie Permanenti</label>
+                        <textarea
+                          value={editFormData.malattie_permanenti}
+                          onChange={(e) => setEditFormData({ ...editFormData, malattie_permanenti: e.target.value })}
+                          rows="2"
+                          style={{ width: '100%', padding: '0.5rem', borderRadius: '0.25rem', border: '1px solid #d1d5db' }}
+                          placeholder="Separare con virgola"
+                        ></textarea>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                        <button
+                          onClick={() => setIsEditingInfo(false)}
+                          className="btn btn-secondary"
+                          style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}
+                        >
+                          Annulla
+                        </button>
+                        <button
+                          onClick={handleUpdatePatient}
+                          className="btn btn-primary"
+                          disabled={loading}
+                          style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}
+                        >
+                          {loading ? '...' : 'Salva'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {foundPatient.allergie && foundPatient.allergie.length > 0 && (
+                        <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: '0.25rem 0' }}>
+                          Allergie: {foundPatient.allergie.join(', ')}
+                        </p>
+                      )}
+                      {foundPatient.malattie_permanenti && foundPatient.malattie_permanenti.length > 0 && (
+                        <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: '0.25rem 0' }}>
+                          Malattie: {foundPatient.malattie_permanenti.join(', ')}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               ) : (

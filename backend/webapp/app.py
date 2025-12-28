@@ -631,6 +631,72 @@ def create_patient():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/patient/update', methods=['PUT'])
+@require_login
+def update_patient():
+    """Update patient clinical information."""
+    data = request.json
+    
+    if not db_connected:
+        return jsonify({'error': 'Database non connesso'}), 500
+    
+    try:
+        fiscal_code = data.get('codice_fiscale')
+        if not fiscal_code:
+            return jsonify({'error': 'Codice fiscale obbligatorio'}), 400
+            
+        # Get existing patient
+        patient = db.get_patient(fiscal_code)
+        if not patient:
+            return jsonify({'error': 'Paziente non trovato'}), 404
+            
+        # Update fields if provided
+        if 'allergie' in data:
+            val = data['allergie']
+            if isinstance(val, str):
+                # Split string by comma or semicolon
+                import re
+                patient.allergie = [x.strip() for x in re.split(r'[;,]', val) if x.strip()]
+            elif isinstance(val, list):
+                patient.allergie = val
+                
+        if 'malattie_permanenti' in data:
+            val = data['malattie_permanenti']
+            if isinstance(val, str):
+                import re
+                patient.malattie_permanenti = [x.strip() for x in re.split(r'[;,]', val) if x.strip()]
+            elif isinstance(val, list):
+                patient.malattie_permanenti = val
+                
+        # Save updates
+        if db.update_patient(patient):
+            return jsonify({
+                'success': True,
+                'message': 'Paziente aggiornato con successo',
+                'patient': {
+                    'nome': patient.nome,
+                    'cognome': patient.cognome,
+                    'codice_fiscale': patient.codice_fiscale,
+                    'data_nascita': patient.data_nascita.strftime('%Y-%m-%d') if patient.data_nascita else None,
+                    'comune_nascita': patient.comune_nascita,
+                    'sesso': patient.gender.value if patient.gender else None,
+                    'gender': patient.gender.value if patient.gender else None,
+                    'is_foreign': patient.is_foreign,
+                    'allergie': patient.allergie,
+                    'malattie_permanenti': patient.malattie_permanenti,
+                    'age': patient.calculate_age() if hasattr(patient, 'calculate_age') else None
+                }
+            })
+        else:
+            return jsonify({'error': 'Errore durante l\'aggiornamento'}), 500
+            
+    except Exception as e:
+        print(f"Error updating patient: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/patient/calculate-cf', methods=['POST'])
 @require_login
 def calculate_cf():
@@ -1132,6 +1198,18 @@ def export_patient_data(fiscal_code):
             ['Genere:', gender],
             ['Età:', age_str],
         ]
+
+        if patient_data.get('allergie'):
+            allergie = patient_data['allergie']
+            if isinstance(allergie, list):
+                allergie = ', '.join(allergie)
+            patient_info.append(['Allergie:', str(allergie)])
+
+        if patient_data.get('malattie_permanenti'):
+            malattie = patient_data['malattie_permanenti']
+            if isinstance(malattie, list):
+                malattie = ', '.join(malattie)
+            patient_info.append(['Malattie Permanenti:', str(malattie)])
         
         patient_table = Table(patient_info, colWidths=[5*cm, 12*cm])
         patient_table.setStyle(TableStyle([
