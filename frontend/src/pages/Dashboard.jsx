@@ -719,7 +719,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                           onChange={(e) => setEditFormData({ ...editFormData, allergie: e.target.value })}
                           rows="2"
                           style={{ width: '100%', padding: '0.5rem', borderRadius: '0.25rem', border: '1px solid #d1d5db' }}
-                          placeholder="Separare con virgola"
+                          placeholder=" con virgola"
                         ></textarea>
                       </div>
                       <div className="form-group" style={{ marginBottom: '1rem' }}>
