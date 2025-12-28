@@ -185,7 +185,7 @@ Fornisci ora una valutazione diagnostica completa e strutturata."""
                     temperature=0.3,
                     top_p=0.95,
                     top_k=40,
-                    max_output_tokens=2048,
+                    max_output_tokens=16384,
                     candidate_count=1,
                 )
             )
@@ -197,7 +197,7 @@ Fornisci ora una valutazione diagnostica completa e strutturata."""
                     temperature=0.3,
                     top_p=0.95,
                     top_k=40,
-                    max_output_tokens=2048,
+                    max_output_tokens=16384,
                     candidate_count=1,
                 )
             )
@@ -219,6 +219,52 @@ Fornisci ora una valutazione diagnostica completa e strutturata."""
             if hasattr(candidate, 'finish_reason'):
                 finish_reason = candidate.finish_reason
         
+        # Handle truncated responses with continuation
+        continuation_count = 0
+        max_continuations = 3
+        
+        while finish_reason and str(finish_reason) != 'STOP' and continuation_count < max_continuations:
+            print(f"[AI] Response truncated (reason: {finish_reason}), requesting continuation {continuation_count + 1}/{max_continuations}...")
+            
+            continuation_prompt = "Continua la diagnosi dal punto in cui ti sei fermato, senza ripetere quanto già scritto:"
+            
+            try:
+                continuation_response = self.model.generate_content(
+                    continuation_prompt,
+                    generation_config=genai.types.GenerationConfig(
+                        temperature=0.3,
+                        top_p=0.95,
+                        top_k=40,
+                        max_output_tokens=16384,
+                        candidate_count=1,
+                    )
+                )
+                
+                if continuation_response and hasattr(continuation_response, 'text'):
+                    diagnosis_text += "\n" + continuation_response.text
+                    print(f"[AI] Continuation received, total length: {len(diagnosis_text)} chars")
+                    
+                    if hasattr(continuation_response, 'candidates') and len(continuation_response.candidates) > 0:
+                        candidate = continuation_response.candidates[0]
+                        if hasattr(candidate, 'finish_reason'):
+                            finish_reason = candidate.finish_reason
+                        else:
+                            finish_reason = 'STOP'
+                    else:
+                        finish_reason = 'STOP'
+                else:
+                    print(f"[AI] WARNING: Invalid continuation response")
+                    break
+                    
+            except Exception as e:
+                print(f"[AI] ERROR during continuation: {e}")
+                break
+            
+            continuation_count += 1
+        
+        if continuation_count > 0:
+            print(f"[AI] Completed with {continuation_count} continuation(s)")
+        
         # Parse and structure the response
         result = {
             'success': True,
@@ -230,7 +276,8 @@ Fornisci ora una valutazione diagnostica completa e strutturata."""
                 'analysis_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 'data_points_analyzed': self._count_data_points(patient_data),
                 'attachments_analyzed': len(image_parts) if has_multimodal_content else 0,
-                'finish_reason': str(finish_reason) if finish_reason else 'COMPLETE'
+                'finish_reason': str(finish_reason) if finish_reason else 'COMPLETE',
+                'continuation_count': continuation_count
             }
         }
         
