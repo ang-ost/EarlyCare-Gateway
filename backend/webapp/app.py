@@ -551,31 +551,50 @@ def create_patient():
         return jsonify({'error': 'Database non connesso'}), 500
     
     try:
+        is_foreign = data.get('is_foreign', False)
+        
         # Validate required fields
-        required_fields = ['nome', 'cognome', 'codice_fiscale', 'data_nascita', 'comune_nascita']
+        required_fields = ['nome', 'cognome', 'data_nascita']
+        if not is_foreign:
+             required_fields.extend(['codice_fiscale', 'comune_nascita'])
+             
         for field in required_fields:
             if not data.get(field):
                 return jsonify({'error': f'Campo obbligatorio mancante: {field}'}), 400
         
-        # Check if patient already exists
-        existing = db.find_by_fiscal_code(data['codice_fiscale'].upper())
-        if existing:
-            return jsonify({'error': 'Paziente già esistente'}), 400
+        # Handle identifiers
+        if is_foreign:
+             codice_fiscale = Patient.generate_foreign_id(data['nome'], data['cognome'])
+             
+             # Ensure uniqueness
+             if db_connected:
+                 while db.find_by_fiscal_code(codice_fiscale):
+                     codice_fiscale = Patient.generate_foreign_id(data['nome'], data['cognome'])
+             
+             comune_nascita = data.get('comune_nascita', 'Estero').strip().title() if data.get('comune_nascita') else 'Estero'
+        else:
+             codice_fiscale = data['codice_fiscale'].strip().upper()
+             comune_nascita = data['comune_nascita'].strip().title()
+             
+             # Check if patient already exists
+             existing = db.find_by_fiscal_code(codice_fiscale)
+             if existing:
+                 return jsonify({'error': 'Paziente già esistente'}), 400
         
-        # Get gender from form data or determine from codice fiscale
-        codice_fiscale = data['codice_fiscale'].upper()
         
         if data.get('sesso'):
             # Use gender from form if provided
             gender = Gender.MALE if data['sesso'].upper() in ['M', 'MALE', 'MASCHIO'] else Gender.FEMALE
         else:
-            # Determine gender from codice fiscale (character at position 9-10)
-            try:
-                day_digit = int(codice_fiscale[9:11])
-                gender = Gender.FEMALE if day_digit > 40 else Gender.MALE
-            except:
-                # Fallback to MALE
-                gender = Gender.MALE
+            # Determine gender from codice fiscale (character at position 9-10) for Italians
+            if not is_foreign:
+                try:
+                    day_digit = int(codice_fiscale[9:11])
+                    gender = Gender.FEMALE if day_digit > 40 else Gender.MALE
+                except:
+                    gender = Gender.MALE
+            else:
+                 gender = Gender.MALE # Default for foreign if not specified
         
         # Parse dates
         data_nascita = datetime.strptime(data['data_nascita'], '%Y-%m-%d')
@@ -586,13 +605,14 @@ def create_patient():
         # Create patient
         patient = Patient(
             patient_id=codice_fiscale,
-            nome=data['nome'].title(),
-            cognome=data['cognome'].title(),
+            nome=data['nome'].strip().title(),
+            cognome=data['cognome'].strip().title(),
             data_nascita=data_nascita,
-            comune_nascita=data['comune_nascita'].title(),
+            comune_nascita=comune_nascita,
             codice_fiscale=codice_fiscale,
             data_decesso=data_decesso,
-            gender=gender
+            gender=gender,
+            is_foreign=is_foreign
         )
         
         # Add allergie (list)
@@ -625,7 +645,8 @@ def create_patient():
                 'sesso': patient.gender.value if hasattr(patient.gender, 'value') else patient.gender,
                 'age': patient.calculate_age(),
                 'allergie': patient.allergie,
-                'malattie_permanenti': patient.malattie_permanenti
+                'malattie_permanenti': patient.malattie_permanenti,
+                'is_foreign': patient.is_foreign
             }
         })
         

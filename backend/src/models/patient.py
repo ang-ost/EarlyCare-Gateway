@@ -36,6 +36,7 @@ class Patient:
     age: Optional[int] = None
     ethnicity: Optional[str] = None
     primary_language: Optional[str] = "it"
+    is_foreign: bool = False
     
     def calculate_age(self) -> int:
         """Calculate patient age."""
@@ -45,6 +46,23 @@ class Patient:
             age -= 1
         self.age = age
         return age
+
+    @staticmethod
+    def generate_foreign_id(nome: str, cognome: str) -> str:
+        """
+        Generate unique foreign patient ID.
+        Format: FirstLetterLastLetterRandomChars (6 chars total)
+        """
+        import string
+        import secrets
+        first_letter_nome = nome[0].upper() if nome else 'X'
+        first_letter_cognome = cognome[0].upper() if cognome else 'X'
+        
+        # Generate 4 random alphanumeric characters
+        chars = string.ascii_uppercase + string.digits
+        random_suffix = ''.join(secrets.choice(chars) for _ in range(4))
+        
+        return f"{first_letter_nome}{first_letter_cognome}{random_suffix}"
     
     def anonymize(self) -> 'Patient':
         """Create anonymized patient record."""
@@ -62,7 +80,8 @@ class Patient:
             medical_record_number="ANONYMIZED" if self.medical_record_number else None,
             age=self.age,
             ethnicity=self.ethnicity,
-            primary_language=self.primary_language
+            primary_language=self.primary_language,
+            is_foreign=self.is_foreign
         )
 
 

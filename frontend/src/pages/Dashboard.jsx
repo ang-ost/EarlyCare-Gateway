@@ -39,7 +39,8 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
     comune_nascita: '',
     sesso: 'M',
     allergie: '',
-    malattie_permanenti: ''
+    malattie_permanenti: '',
+    is_foreign: false
   })
 
   const [recordFormData, setRecordFormData] = useState({
@@ -109,8 +110,9 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
   }
 
   const handleCreateFormChange = (e) => {
-    const { name, value } = e.target
-    setCreateFormData({ ...createFormData, [name]: value })
+    const { name, value, type, checked } = e.target
+    const val = type === 'checkbox' ? checked : value
+    setCreateFormData({ ...createFormData, [name]: val })
   }
 
   const handleExport = async () => {
@@ -167,7 +169,13 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
 
   // Calcola il CF man mano che si inseriscono i dati
   useEffect(() => {
-    const { nome, cognome, data_nascita, sesso, comune_nascita } = createFormData
+    const { nome, cognome, data_nascita, sesso, comune_nascita, is_foreign } = createFormData
+
+    if (is_foreign) {
+      setCalculatedCF('')
+      return
+    }
+
     if (nome && cognome && data_nascita && sesso && comune_nascita) {
       // Chiama il backend per calcolare il CF
       const fetchCF = async () => {
@@ -198,7 +206,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
     } else {
       setCalculatedCF('')
     }
-  }, [createFormData.nome, createFormData.cognome, createFormData.data_nascita, createFormData.sesso, createFormData.comune_nascita])
+  }, [createFormData.nome, createFormData.cognome, createFormData.data_nascita, createFormData.sesso, createFormData.comune_nascita, createFormData.is_foreign])
 
   const handlePatientSearch = async (e) => {
     e.preventDefault()
@@ -252,7 +260,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
     setLoading(true)
 
     try {
-      if (!calculatedCF || calculatedCF.startsWith('⚠️')) {
+      if (!createFormData.is_foreign && (!calculatedCF || calculatedCF.startsWith('⚠️'))) {
         setToast({ type: 'error', message: 'Codice fiscale non valido o non calcolato' })
         setLoading(false)
         return
@@ -265,13 +273,14 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
         body: JSON.stringify({
           nome: createFormData.nome,
           cognome: createFormData.cognome,
-          codice_fiscale: calculatedCF,
+          codice_fiscale: calculatedCF, // Passed but ignored by backend if is_foreign is true
           data_nascita: createFormData.data_nascita,
           data_decesso: createFormData.data_decesso || undefined,
           comune_nascita: createFormData.comune_nascita,
           sesso: createFormData.sesso,
           allergie: createFormData.allergie,
-          malattie_permanenti: createFormData.malattie_permanenti
+          malattie_permanenti: createFormData.malattie_permanenti,
+          is_foreign: createFormData.is_foreign
         })
       })
 
@@ -306,7 +315,8 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
         comune_nascita: '',
         sesso: 'M',
         allergie: '',
-        malattie_permanenti: ''
+        malattie_permanenti: '',
+        is_foreign: false
       })
     } catch (err) {
       setToast({ type: 'error', message: 'Errore di connessione: ' + err.message })
@@ -1230,6 +1240,19 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                 </div>
               </div>
 
+              <div className="form-group" style={{ marginBottom: '1rem', marginTop: '0.5rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    name="is_foreign"
+                    checked={createFormData.is_foreign}
+                    onChange={handleCreateFormChange}
+                    style={{ width: '1.2rem', height: '1.2rem' }}
+                  />
+                  <span>🌍 Paziente Straniero (Genera ID casuale)</span>
+                </label>
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
                   <label>Data Nascita *</label>
@@ -1243,16 +1266,16 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group" style={{ position: 'relative' }}>
-                  <label>Comune Nascita *</label>
+                  <label>Comune Nascita {!createFormData.is_foreign && '*'}</label>
                   <input
                     type="text"
                     value={createFormData.comune_nascita}
                     onChange={(e) => handleComuneInput(e.target.value)}
                     name="comune_nascita"
-                    placeholder="Inizia a digitare il nome del comune..."
-                    required
+                    placeholder={createFormData.is_foreign ? "Inserisci città o stato..." : "Inizia a digitare il nome del comune..."}
+                    required={!createFormData.is_foreign}
                   />
-                  {showComuniList && comuniSuggest.length > 0 && (
+                  {showComuniList && comuniSuggest.length > 0 && !createFormData.is_foreign && (
                     <div style={{
                       position: 'absolute',
                       top: '100%',
@@ -1301,7 +1324,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                 </div>
               </div>
 
-              {calculatedCF && (
+              {calculatedCF && !createFormData.is_foreign && (
                 <div style={{
                   backgroundColor: '#f0f4ff',
                   border: '2px solid #1e3a8a',
@@ -1312,6 +1335,20 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                 }}>
                   <p style={{ margin: 0, fontSize: '0.9rem', color: '#6b7280', marginBottom: '0.5rem' }}>📋 Codice Fiscale</p>
                   <p style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold', color: '#1e3a8a', fontFamily: 'monospace' }}>{calculatedCF}</p>
+                </div>
+              )}
+
+              {createFormData.is_foreign && (
+                <div style={{
+                  backgroundColor: '#fef3c7',
+                  border: '2px solid #d97706',
+                  borderRadius: '8px',
+                  padding: '1rem',
+                  marginTop: '1.5rem',
+                  marginBottom: '1.5rem'
+                }}>
+                  <p style={{ margin: 0, fontSize: '0.9rem', color: '#92400e', marginBottom: '0.5rem' }}>🌍 ID Paziente Straniero</p>
+                  <p style={{ margin: 0, fontSize: '1rem', fontWeight: 'bold', color: '#d97706' }}>Verrà generato automaticamente al salvataggio</p>
                 </div>
               )}
 

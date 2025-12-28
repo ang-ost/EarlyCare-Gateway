@@ -133,6 +133,7 @@ class MongoDBPatientRepository:
             "age": patient.age,
             "ethnicity": patient.ethnicity,
             "primary_language": patient.primary_language,
+            "is_foreign": patient.is_foreign,
             "created_at": datetime.now(),
             "updated_at": datetime.now()
         }
@@ -170,7 +171,8 @@ class MongoDBPatientRepository:
                 medical_record_number=data.get("medical_record_number", ""),
                 age=data.get("age"),
                 ethnicity=data.get("ethnicity"),
-                primary_language=data.get("primary_language", "it")
+                primary_language=data.get("primary_language", "it"),
+                is_foreign=data.get("is_foreign", False)
             )
         except Exception as e:
             logger.error(f"Error converting dict to patient: {e}")
