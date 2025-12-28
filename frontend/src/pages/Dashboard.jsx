@@ -12,8 +12,18 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
   const [showDiagnosisModal, setShowDiagnosisModal] = useState(false)
 
   const [searchFiscalCode, setSearchFiscalCode] = useState('')
-  const [foundPatient, setFoundPatient] = useState(null)
-  const [clinicalRecords, setClinicalRecords] = useState([])
+
+  // Initialize state from sessionStorage if available
+  const [foundPatient, setFoundPatient] = useState(() => {
+    const saved = sessionStorage.getItem('foundPatient')
+    return saved ? JSON.parse(saved) : null
+  })
+
+  const [clinicalRecords, setClinicalRecords] = useState(() => {
+    const saved = sessionStorage.getItem('clinicalRecords')
+    return saved ? JSON.parse(saved) : []
+  })
+
   const [expandedRecord, setExpandedRecord] = useState(null)
   const [selectedRecord, setSelectedRecord] = useState(null)
   const [selectedRecords, setSelectedRecords] = useState([])
@@ -51,7 +61,23 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
   const [showComuniList, setShowComuniList] = useState(false)
   const [calculatedCF, setCalculatedCF] = useState('')
 
+  // Persist patient data to sessionStorage
+  useEffect(() => {
+    if (foundPatient) {
+      sessionStorage.setItem('foundPatient', JSON.stringify(foundPatient))
+    } else {
+      sessionStorage.removeItem('foundPatient')
+    }
+  }, [foundPatient])
+
+  // Persist clinical records to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem('clinicalRecords', JSON.stringify(clinicalRecords))
+  }, [clinicalRecords])
+
   const handleLogout = async () => {
+    sessionStorage.removeItem('foundPatient')
+    sessionStorage.removeItem('clinicalRecords')
     await fetch(getApiUrl('/api/auth/logout'), { method: 'POST', credentials: 'include' })
     onLogout()
   }
