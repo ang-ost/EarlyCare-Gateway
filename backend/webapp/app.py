@@ -1148,6 +1148,10 @@ def export_patient_data(fiscal_code):
             story.append(Spacer(1, 0.3*cm))
             
             for idx, record in enumerate(clinical_records, 1):
+                # Add page break before each record except the first one
+                if idx > 1:
+                    story.append(PageBreak())
+
                 # Record header
                 timestamp = record.get('timestamp', 'N/A')
                 if isinstance(timestamp, datetime):
