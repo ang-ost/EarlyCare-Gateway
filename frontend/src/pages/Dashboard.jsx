@@ -288,6 +288,15 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
       }
 
       setToast({ type: 'success', message: 'Paziente creato con successo!' })
+
+      // Imposta il nuovo paziente come attivo
+      if (data.patient) {
+        setFoundPatient(data.patient)
+        setClinicalRecords([])
+        setSelectedRecord(null)
+        setExpandedRecord(null)
+      }
+
       setShowPatientForm(false)
       setCreateFormData({
         nome: '',

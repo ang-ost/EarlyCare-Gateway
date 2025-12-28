@@ -612,7 +612,22 @@ def create_patient():
         # Save to database
         db.save_patient(patient)
         
-        return jsonify({'success': True, 'message': 'Paziente creato con successo'})
+        return jsonify({
+            'success': True, 
+            'message': 'Paziente creato con successo',
+            'patient': {
+                'nome': patient.nome,
+                'cognome': patient.cognome,
+                'codice_fiscale': patient.codice_fiscale,
+                'data_nascita': patient.data_nascita.strftime('%Y-%m-%d'),
+                'data_decesso': patient.data_decesso.strftime('%Y-%m-%d') if patient.data_decesso else None,
+                'comune_nascita': patient.comune_nascita,
+                'sesso': patient.gender.value if hasattr(patient.gender, 'value') else patient.gender,
+                'age': patient.calculate_age(),
+                'allergie': patient.allergie,
+                'malattie_permanenti': patient.malattie_permanenti
+            }
+        })
         
     except Exception as e:
         import traceback
