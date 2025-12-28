@@ -607,7 +607,16 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                     <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: '0.25rem 0' }}>Comune: {foundPatient.comune_nascita}</p>
                   )}
                   {foundPatient.gender && (
-                    <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: '0.25rem 0' }}>Genere: {foundPatient.gender}</p>
+                    <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: '0.25rem 0' }}>
+                      Genere: {
+                        (() => {
+                          const g = foundPatient.gender.toString().toLowerCase()
+                          if (g === 'male' || g === 'm' || g === 'maschio') return 'Maschile'
+                          if (g === 'female' || g === 'f' || g === 'femmina') return 'Femminile'
+                          return foundPatient.gender
+                        })()
+                      }
+                    </p>
                   )}
                   {foundPatient.age && (
                     <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: '0.25rem 0' }}>Età: {foundPatient.age} anni</p>

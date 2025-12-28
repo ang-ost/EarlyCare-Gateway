@@ -1100,7 +1100,14 @@ def export_patient_data(fiscal_code):
         
         # Gestisci i campi che potrebbero essere None - usa le chiavi corrette restituite da find_by_fiscal_code
         comune_nascita = patient_data.get('luogo_nascita') or patient_data.get('comune_nascita') or 'N/A'
-        gender = patient_data.get('sesso') or patient_data.get('gender') or 'N/A'
+        raw_gender = patient_data.get('sesso') or patient_data.get('gender') or 'N/A'
+        gender = raw_gender
+        if isinstance(raw_gender, str):
+            g_lower = raw_gender.lower()
+            if g_lower in ['male', 'm', 'maschio']:
+                gender = 'Maschile'
+            elif g_lower in ['female', 'f', 'femmina']:
+                gender = 'Femminile'
         age = patient_data.get('age')
         age_str = str(age) if age is not None else 'N/A'
         
