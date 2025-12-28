@@ -1249,7 +1249,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                     onChange={handleCreateFormChange}
                     style={{ width: '1.2rem', height: '1.2rem' }}
                   />
-                  <span>🌍 Paziente Straniero (Genera ID casuale)</span>
+                  <span>Paziente Straniero (Genera ID casuale)</span>
                 </label>
               </div>
 

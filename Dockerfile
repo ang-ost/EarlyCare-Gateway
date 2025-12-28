@@ -28,7 +28,7 @@ RUN pip install --no-cache-dir \
 # Copia il codice sorgente dal backend
 COPY backend/src ./src
 COPY backend/webapp ./webapp
-COPY backend/config ./config
+
 
 # Copia le cartelle necessarie dalla root
 COPY cartelle_cliniche ./cartelle_cliniche

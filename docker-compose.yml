@@ -19,27 +19,27 @@ services:
       MONGODB_SERVER_SELECTION_TIMEOUT: ${MONGODB_SERVER_SELECTION_TIMEOUT:-10000}
       MONGODB_CONNECT_TIMEOUT: ${MONGODB_CONNECT_TIMEOUT:-20000}
       MONGODB_SOCKET_TIMEOUT: ${MONGODB_SOCKET_TIMEOUT:-20000}
-      
+
       # Flask Configuration
       FLASK_APP: webapp/app.py
       FLASK_ENV: ${FLASK_ENV:-production}
       FLASK_SECRET_KEY: ${FLASK_SECRET_KEY}
-      
+
       # API Keys
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       CHATBOT_GEMINI_API_KEY: ${CHATBOT_GEMINI_API_KEY}
-      
+
       # Security Settings
       MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-100}
-      
+
     volumes:
       - ./cartelle_cliniche:/app/cartelle_cliniche
       - ./backend/webapp/uploads:/app/webapp/uploads
-      - ./backend/config:/app/config
+
     networks:
       - earlycare-network
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/health')"]
+      test: [ "CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/health')" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -59,7 +59,7 @@ services:
     networks:
       - earlycare-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80" ]
       interval: 30s
       timeout: 10s
       retries: 3

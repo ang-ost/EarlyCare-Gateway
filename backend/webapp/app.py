@@ -26,10 +26,7 @@ import re
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.config import Config
-from src.gateway.clinical_gateway import ClinicalGateway
-from src.gateway.folder_processor import ClinicalFolderProcessor
-from src.strategy.strategy_selector import StrategySelector
-from src.observer.metrics_observer import MetricsObserver, AuditObserver
+
 from src.models.patient import Patient, Gender
 from src.models.doctor import Doctor
 
@@ -113,9 +110,6 @@ app.config['PERMANENT_SESSION_LIFETIME'] = 86400 * 7  # 7 days
 app.config['UPLOAD_FOLDER'].mkdir(exist_ok=True)
 
 # Global variables for system state
-gateway = None
-processor = None
-metrics_observer = None
 db = None
 db_connected = False
 ai_diagnostics = None
@@ -124,7 +118,7 @@ chatbot_ai = None
 
 def initialize_system():
     """Initialize the clinical gateway system."""
-    global gateway, processor, metrics_observer, db, db_connected, ai_diagnostics, chatbot_ai
+    global db, db_connected, ai_diagnostics, chatbot_ai
     
     try:
         # Initialize MongoDB
@@ -168,25 +162,6 @@ def initialize_system():
                 chatbot_ai = None
         else:
             print("⚠️  Chatbot AI not available (missing CHATBOT_GEMINI_API_KEY)")
-        
-        # Initialize gateway components
-        gateway = ClinicalGateway()
-        processor = ClinicalFolderProcessor(gateway)
-        
-        # Setup observers
-        metrics_observer = MetricsObserver()
-        audit_observer = AuditObserver()
-        
-        # Attach observers if gateway supports it
-        if hasattr(gateway, 'attach'):
-            gateway.attach(metrics_observer)
-            gateway.attach(audit_observer)
-        else:
-            # Gateway doesn't support observer pattern, skip
-            print("Gateway doesn't support observer pattern")
-        
-        # Gateway already has default strategy selector initialized in __init__
-        # No need to override it unless we want custom strategies
         
         return True
     except Exception as e:
@@ -1019,22 +994,20 @@ def upload_file():
             file.save(filepath)
             
             # Process file
-            if gateway:
-                result = gateway.process_data(str(filepath))
-                
-                # Save to database if connected
-                if db_connected and fiscal_code:
-                    record = {
-                        'timestamp': datetime.now().isoformat(),
-                        'type': 'file_processing',
-                        'filename': filename,
-                        'result': result,
-                    }
-                    db.add_clinical_record(fiscal_code, record)
-                
-                return jsonify({'success': True, 'result': result})
-            else:
-                return jsonify({'error': 'Gateway non inizializzato'}), 500
+            # Process file
+            # Gateway removed as it was broken/unused
+            
+            # Save to database if connected
+            if db_connected and fiscal_code:
+                record = {
+                    'timestamp': datetime.now().isoformat(),
+                    'type': 'file_upload',
+                    'filename': filename,
+                    'result': 'File uploaded successfully',
+                }
+                db.add_clinical_record(fiscal_code, record)
+            
+            return jsonify({'success': True, 'message': 'File caricato con successo', 'result': 'File uploaded, no processing available'})
                 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1044,10 +1017,12 @@ def upload_file():
 @require_login
 def get_metrics():
     """Get system metrics."""
-    if metrics_observer:
-        metrics = metrics_observer.get_summary()
-        return jsonify({'success': True, 'metrics': metrics})
-    return jsonify({'error': 'Metrics observer non disponibile'}), 500
+    # Metrics observer removed
+    return jsonify({'success': True, 'metrics': {
+        'requests_total': 0,
+        'uptime_seconds': 0,
+        'success_rate': 0
+    }})
 
 
 @app.route('/api/export/<fiscal_code>', methods=['GET', 'POST'])

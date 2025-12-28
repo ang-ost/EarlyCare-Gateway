@@ -9,7 +9,7 @@ from typing import Optional
 from dotenv import load_dotenv
 
 # Load .env file from project root
-project_root = Path(__file__).parent.parent
+project_root = Path(__file__).parent.parent.parent
 env_path = project_root / '.env'
 load_dotenv(dotenv_path=env_path)
 
@@ -48,7 +48,7 @@ class Config:
     FLASK_DEBUG: bool = os.getenv('FLASK_DEBUG', 'true').lower() == 'true'
     
     # Upload Settings
-    MAX_UPLOAD_SIZE_MB: int = int(os.getenv('MAX_UPLOAD_SIZE_MB', '100'))
+    MAX_UPLOAD_SIZE_MB: int = int(os.getenv('MAX_UPLOAD_SIZE_MB', '500'))
     
     # ============================================
     # Gateway Configuration
