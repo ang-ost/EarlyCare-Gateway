@@ -1504,6 +1504,176 @@ def diagnostics_status():
     }), 200
 
 
+@app.route('/api/diagnostics/export-pdf', methods=['POST'])
+@require_login
+def export_diagnosis_pdf():
+    """Export diagnosis as formatted PDF file."""
+    try:
+        data = request.json
+        diagnosis_data = data.get('diagnosis')
+        patient_data = data.get('patient')
+        
+        if not diagnosis_data or not patient_data:
+            return jsonify({'error': 'Dati mancanti'}), 400
+        
+        memory_file = io.BytesIO()
+        doc = SimpleDocTemplate(memory_file, pagesize=A4,
+                               leftMargin=2*cm, rightMargin=2*cm,
+                               topMargin=2*cm, bottomMargin=2*cm)
+        
+        story = []
+        styles = getSampleStyleSheet()
+        
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            textColor=colors.HexColor('#667eea'),
+            spaceAfter=30,
+            alignment=TA_CENTER
+        )
+        
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=16,
+            textColor=colors.HexColor('#764ba2'),
+            spaceAfter=12,
+            spaceBefore=12
+        )
+        
+        info_style = ParagraphStyle(
+            'InfoStyle',
+            parent=styles['Normal'],
+            fontSize=10,
+            textColor=colors.HexColor('#374151'),
+            spaceAfter=6
+        )
+        
+        diagnosis_style = ParagraphStyle(
+            'DiagnosisStyle',
+            parent=styles['Normal'],
+            fontSize=11,
+            textColor=colors.HexColor('#1f2937'),
+            leading=16,
+            spaceAfter=8
+        )
+        
+        story.append(Paragraph("Diagnosi Medica AI", title_style))
+        story.append(Spacer(1, 0.5*cm))
+        
+        story.append(Paragraph("Informazioni Paziente", heading_style))
+        
+        patient_info = [
+            ['Paziente:', f"{patient_data.get('nome', 'N/A')} {patient_data.get('cognome', 'N/A')}"],
+            ['Codice Fiscale:', patient_data.get('codice_fiscale', 'N/A')],
+            ['Data Analisi:', datetime.fromisoformat(diagnosis_data.get('timestamp', '')).strftime('%d/%m/%Y %H:%M:%S') if diagnosis_data.get('timestamp') else 'N/A'],
+        ]
+        
+        if diagnosis_data.get('metadata'):
+            metadata = diagnosis_data['metadata']
+            if metadata.get('data_points_analyzed'):
+                patient_info.append(['Punti Dati Analizzati:', str(metadata['data_points_analyzed'])])
+            if metadata.get('attachments_analyzed'):
+                patient_info.append(['Allegati Analizzati:', str(metadata['attachments_analyzed'])])
+        
+        patient_table = Table(patient_info, colWidths=[5*cm, 12*cm])
+        patient_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#e0e7ff')),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ]))
+        
+        story.append(patient_table)
+        story.append(Spacer(1, 1*cm))
+        
+        story.append(Paragraph("Valutazione Diagnostica", heading_style))
+        story.append(Spacer(1, 0.3*cm))
+        
+        diagnosis_text = diagnosis_data.get('diagnosis', '')
+        
+        for line in diagnosis_text.split('\n'):
+            if line.strip():
+                if line.strip().isupper() and len(line.strip()) < 50:
+                    section_style = ParagraphStyle(
+                        'SectionStyle',
+                        parent=styles['Heading3'],
+                        fontSize=13,
+                        textColor=colors.HexColor('#1e40af'),
+                        spaceAfter=8,
+                        spaceBefore=12
+                    )
+                    story.append(Paragraph(line.strip(), section_style))
+                else:
+                    story.append(Paragraph(line.strip(), diagnosis_style))
+            else:
+                story.append(Spacer(1, 0.2*cm))
+        
+        story.append(Spacer(1, 1*cm))
+        
+        warning_style = ParagraphStyle(
+            'WarningStyle',
+            parent=styles['Normal'],
+            fontSize=10,
+            textColor=colors.HexColor('#92400e'),
+            leading=14,
+            leftIndent=10,
+            rightIndent=10
+        )
+        
+        story.append(Paragraph("NOTA IMPORTANTE", heading_style))
+        story.append(Paragraph(
+            "Questa è una valutazione generata da intelligenza artificiale a scopo di supporto decisionale. "
+            "La diagnosi finale e le decisioni terapeutiche devono sempre essere effettuate da un medico qualificato.",
+            warning_style
+        ))
+        
+        story.append(Spacer(1, 1*cm))
+        
+        footer_style = ParagraphStyle(
+            'Footer',
+            parent=styles['Normal'],
+            fontSize=8,
+            textColor=colors.grey,
+            alignment=TA_CENTER
+        )
+        
+        story.append(Paragraph(
+            f"Documento generato il {datetime.now().strftime('%d/%m/%Y alle %H:%M:%S')}",
+            footer_style
+        ))
+        story.append(Paragraph("EarlyCare Gateway - Sistema di Diagnostica AI", footer_style))
+        
+        doc.build(story)
+        
+        memory_file.seek(0)
+        
+        filename = f"diagnosi_{patient_data.get('codice_fiscale', 'unknown')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        
+        return send_file(
+            memory_file,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=filename
+        )
+        
+    except Exception as e:
+        print(f"Error in export_diagnosis_pdf: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 # ========== MEDICAL CHATBOT ROUTES ==========
 
 @app.route('/api/chatbot/ask', methods=['POST'])

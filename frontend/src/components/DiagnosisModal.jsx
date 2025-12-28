@@ -17,7 +17,7 @@ export default function DiagnosisModal({ patient, selectedRecord, onClose }) {
     setError(null)
 
     try {
-      const body = selectedRecord 
+      const body = selectedRecord
         ? { fiscal_code: patient.codice_fiscale, clinical_record: selectedRecord }
         : { fiscal_code: patient.codice_fiscale }
 
@@ -42,42 +42,37 @@ export default function DiagnosisModal({ patient, selectedRecord, onClose }) {
     }
   }
 
-  const downloadDiagnosis = () => {
+  const downloadDiagnosis = async () => {
     if (!diagnosis) return
 
-    const content = `
-DIAGNOSI MEDICA AI
-================================================================================
+    try {
+      const res = await fetch(getApiUrl('/api/diagnostics/export-pdf'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          diagnosis: diagnosis,
+          patient: patient
+        })
+      })
 
-Paziente: ${patient.nome} ${patient.cognome}
-Codice Fiscale: ${patient.codice_fiscale}
-Data Analisi: ${new Date(diagnosis.timestamp).toLocaleString('it-IT')}
-Modello AI: ${diagnosis.metadata?.model || 'gemini-3-flash-preview'}
-Punti Dati Analizzati: ${diagnosis.metadata?.data_points_analyzed || 'N/A'}
+      if (!res.ok) {
+        throw new Error('Errore durante l\'export del PDF')
+      }
 
-================================================================================
-
-${diagnosis.diagnosis}
-
-================================================================================
-
-NOTA IMPORTANTE:
-Questa è una valutazione generata da intelligenza artificiale a scopo di 
-supporto decisionale. La diagnosi finale e le decisioni terapeutiche devono 
-sempre essere effettuate da un medico qualificato.
-
-Generato da EarlyCare Gateway - ${new Date().toISOString()}
-`
-
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `diagnosi_${patient.codice_fiscale}_${new Date().toISOString().split('T')[0]}.txt`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `diagnosi_${patient.codice_fiscale}_${new Date().toISOString().split('T')[0]}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Errore durante il download:', error)
+      alert('Errore durante il download del PDF')
+    }
   }
 
   return (
@@ -119,12 +114,12 @@ Generato da EarlyCare Gateway - ${new Date().toISOString()}
 
         {diagnosis && !loading && !error && (
           <>
-            <div style={{ 
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
-              color: 'white', 
-              padding: '1.5rem', 
-              borderRadius: '8px', 
-              marginBottom: '1.5rem' 
+            <div style={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              padding: '1.5rem',
+              borderRadius: '8px',
+              marginBottom: '1.5rem'
             }}>
               <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 👤 Paziente: {patient.nome} {patient.cognome}
@@ -140,16 +135,16 @@ Generato da EarlyCare Gateway - ${new Date().toISOString()}
               </p>
             </div>
 
-            <div style={{ 
-              background: 'white', 
-              padding: '1.5rem', 
-              borderRadius: '8px', 
+            <div style={{
+              background: 'white',
+              padding: '1.5rem',
+              borderRadius: '8px',
               border: '1px solid #e5e7eb',
               marginBottom: '1.5rem'
             }}>
-              <div style={{ 
-                whiteSpace: 'pre-wrap', 
-                lineHeight: '1.8', 
+              <div style={{
+                whiteSpace: 'pre-wrap',
+                lineHeight: '1.8',
                 color: '#374151',
                 fontSize: '1rem'
               }}>
@@ -158,9 +153,9 @@ Generato da EarlyCare Gateway - ${new Date().toISOString()}
             </div>
 
             {diagnosis.warning && (
-              <div className="alert" style={{ 
-                background: '#fee2e2', 
-                border: '1px solid #ef4444', 
+              <div className="alert" style={{
+                background: '#fee2e2',
+                border: '1px solid #ef4444',
                 borderRadius: '8px',
                 padding: '1rem',
                 marginBottom: '1.5rem',
@@ -170,9 +165,9 @@ Generato da EarlyCare Gateway - ${new Date().toISOString()}
               </div>
             )}
 
-            <div className="alert" style={{ 
-              background: '#fef3c7', 
-              border: '1px solid #fbbf24', 
+            <div className="alert" style={{
+              background: '#fef3c7',
+              border: '1px solid #fbbf24',
               borderRadius: '8px',
               padding: '1rem',
               marginBottom: '1.5rem'
