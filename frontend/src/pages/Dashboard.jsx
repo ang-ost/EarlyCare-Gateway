@@ -1311,7 +1311,7 @@ export default function Dashboard({ user, onNavigate, onLogout }) {
                   type="text"
                   value={searchFiscalCode}
                   onChange={(e) => setSearchFiscalCode(e.target.value.toUpperCase())}
-                  placeholder="RSSMRA90A01H501Z"
+                  placeholder="e.g. RSSMRA90A01H501Z"
                   required
                 />
               </div>
