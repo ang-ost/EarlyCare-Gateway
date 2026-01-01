@@ -1053,8 +1053,8 @@ MAV can be deployed on Render using two separate services:
 \begin{itemize}
     \item \textbf{Type}: Web Service
     \item \textbf{Runtime}: Python 3.8+
-    \item \textbf{Build Command}: \texttt{pip install -r backend/requirements.txt}
-    \item \textbf{Start Command}: \texttt{python backend/webapp/app.py}
+    \item \textbf{Build Command}: \texttt{pip install -r requirements.txt}
+    \item \textbf{Start Command}: \texttt{gunicorn --bind 0.0.0.0:\$PORT --workers 2 --timeout 120 wsgi:app}
     \item \textbf{Port}: Auto-detected from Flask application
     \item \textbf{Health Check Path}: \texttt{/api/health} (recommended)
 \end{itemize}
@@ -1063,7 +1063,7 @@ MAV can be deployed on Render using two separate services:
 
 \begin{itemize}
     \item \textbf{Type}: Static Site
-    \item \textbf{Build Command}: \texttt{cd frontend \&\& npm install \&\& npm run build}
+    \item \textbf{Build Command}: \texttt{npm install \&\& npm run build}
     \item \textbf{Publish Directory}: \texttt{frontend/dist}
     \item \textbf{Auto-Deploy}: Enabled on main branch commits
 \end{itemize}
