@@ -276,14 +276,228 @@ CORS(app,
 %==========================================
 \chapter{Design Patterns Analysis}
 
-The system implements several GoF (Gang of Four) design patterns to ensure maintainability and extensibility.
+The system implements several GoF (Gang of Four) design patterns to ensure maintainability, extensibility, and production-ready monitoring capabilities.
 
 \section{Implemented Patterns}
 
-\subsection{Strategy Pattern (Partially Implemented)}
-The AI module is designed to support multiple strategies, currently using Google Gemini as the sole provider. The architecture easily allows adding other AI providers (OpenAI, Claude, etc.) through common interfaces.
+\subsection{Chain of Responsibility Pattern (Implemented)}
+
+The Chain of Responsibility pattern is implemented for the data processing pipeline, handling validation, enrichment, privacy compliance, and triage assessment in a sequential chain.
+
+\subsubsection{Architecture}
+
+The pipeline consists of four handlers:
+
+\begin{itemize}
+    \item \textbf{ValidationHandler}: Validates incoming patient data for required fields
+    \item \textbf{EnrichmentHandler}: Enriches data with calculated fields (e.g., age from birth date)
+    \item \textbf{PrivacyHandler}: Applies privacy rules and data protection policies
+    \item \textbf{TriageHandler}: Performs triage assessment based on clinical data
+\end{itemize}
+
+\begin{lstlisting}[language=Python, caption=Chain of Responsibility Implementation]
+class DataProcessingPipeline:
+    def __init__(self):
+        self.validation = ValidationHandler()
+        self.enrichment = EnrichmentHandler()
+        self.privacy = PrivacyHandler()
+        self.triage = TriageHandler()
+        
+        self.validation.set_next(self.enrichment)\
+            .set_next(self.privacy)\
+            .set_next(self.triage)
+    
+    def process(self, data):
+        return self.validation.handle(data)
+\end{lstlisting}
+
+\subsubsection{Usage}
+
+The pipeline is invoked during patient creation to ensure data quality and compliance:
+
+\begin{lstlisting}[language=Python, caption=Pipeline Usage in Patient Creation]
+if data_pipeline:
+    patient_dict = {
+        'fiscal_code': patient.codice_fiscale,
+        'birth_date': patient.data_nascita.isoformat(),
+        'nome': patient.nome,
+        'cognome': patient.cognome
+    }
+    processed_data = data_pipeline.process(patient_dict)
+\end{lstlisting}
+
+\subsection{Strategy Pattern (Implemented)}
+
+The Strategy pattern enables runtime selection of different AI models for medical diagnosis generation. Currently supports Google Gemini with architecture ready for OpenAI GPT and Anthropic Claude.
+
+\subsubsection{Available Strategies}
+
+\begin{itemize}
+    \item \textbf{GeminiStrategy}: Google Gemini AI (active)
+    \item \textbf{OpenAIStrategy}: OpenAI GPT (placeholder for future implementation)
+    \item \textbf{ClaudeStrategy}: Anthropic Claude (placeholder for future implementation)
+\end{itemize}
+
+\begin{lstlisting}[language=Python, caption=Strategy Pattern Implementation]
+class AIModelContext:
+    def __init__(self, strategy):
+        self._strategy = strategy
+    
+    def set_strategy(self, strategy):
+        self._strategy = strategy
+    
+    def generate_diagnosis(self, patient_data):
+        return self._strategy.generate_diagnosis(patient_data)
+    
+    def get_current_model(self):
+        return self._strategy.get_model_name()
+\end{lstlisting}
+
+\subsubsection{Runtime Model Selection}
+
+The system initializes with Gemini as the default strategy and allows switching models at runtime:
+
+\begin{lstlisting}[language=Python, caption=Strategy Usage in Diagnosis Generation]
+if ai_strategy_context:
+    diagnosis_result = ai_strategy_context.generate_diagnosis(patient_data)
+    print(f"Using AI model: {ai_strategy_context.get_current_model()}")
+else:
+    diagnosis_result = ai_diagnostics.generate_diagnosis(patient_data)
+\end{lstlisting}
+
+\subsection{Observer Pattern (Implemented)}
+
+The Observer pattern provides production monitoring through event logging, metrics tracking, and alerting capabilities.
+
+\subsubsection{Observer Types}
+
+\begin{itemize}
+    \item \textbf{AuditLogObserver}: Logs all system events to audit trail database
+    \item \textbf{MetricsObserver}: Tracks system metrics (event counts, types, timestamps)
+    \item \textbf{AlertObserver}: Sends alerts when error thresholds are exceeded
+\end{itemize}
+
+\begin{lstlisting}[language=Python, caption=Observer Pattern Implementation]
+class MonitoringSystem(Subject):
+    def __init__(self, db=None):
+        super().__init__()
+        self.audit_observer = AuditLogObserver(db.audit_logs if db else None)
+        self.metrics_observer = MetricsObserver()
+        self.alert_observer = AlertObserver()
+        
+        self.attach(self.audit_observer)
+        self.attach(self.metrics_observer)
+        self.attach(self.alert_observer)
+    
+    def log_event(self, event_type, description, user_id=None, 
+                  severity='info', metadata=None):
+        event = {
+            'event_type': event_type,
+            'description': description,
+            'user_id': user_id,
+            'severity': severity,
+            'metadata': metadata or {},
+            'timestamp': datetime.now()
+        }
+        self.notify(event)
+\end{lstlisting}
+
+\subsubsection{Event Monitoring}
+
+Events are logged throughout the application lifecycle:
+
+\begin{lstlisting}[language=Python, caption=Observer Usage for Event Logging]
+if monitoring_system:
+    monitoring_system.log_event(
+        'patient_created',
+        f'New patient created: {patient.nome} {patient.cognome}',
+        user_id=session.get('doctor_id'),
+        severity='info',
+        metadata={'codice_fiscale': patient.codice_fiscale}
+    )
+\end{lstlisting}
+
+\subsubsection{Metrics Retrieval}
+
+Real-time metrics are accessible via API endpoint:
+
+\begin{lstlisting}[language=Python, caption=Metrics API Endpoint]
+@app.route('/api/metrics', methods=['GET'])
+@require_login
+def get_metrics():
+    if monitoring_system:
+        metrics = monitoring_system.get_metrics()
+        return jsonify({
+            'success': True, 
+            'metrics': metrics,
+            'patterns_active': {
+                'chain_of_responsibility': data_pipeline is not None,
+                'strategy': ai_strategy_context is not None,
+                'observer': monitoring_system is not None,
+                'facade': clinical_facade is not None
+            }
+        })
+\end{lstlisting}
+
+\subsection{Facade Pattern (Implemented)}
+
+The Facade pattern provides a simplified interface for integration with external clinical systems including HL7/FHIR messaging, PACS, and LIS.
+
+\subsubsection{Integrated Systems}
+
+\begin{itemize}
+    \item \textbf{HL7Interface}: Health Level 7 messaging (ADT, ORM messages)
+    \item \textbf{FHIRInterface}: FHIR REST API (Patient, Observation resources)
+    \item \textbf{PACSInterface}: Picture Archiving and Communication System
+    \item \textbf{LISInterface}: Laboratory Information System
+\end{itemize}
+
+\begin{lstlisting}[language=Python, caption=Facade Pattern Implementation]
+class ClinicalSystemsFacade:
+    def __init__(self):
+        self.hl7 = HL7Interface()
+        self.fhir = FHIRInterface()
+        self.pacs = PACSInterface()
+        self.lis = LISInterface()
+    
+    def register_patient(self, patient_data):
+        results = {
+            'hl7_adt': self.hl7.send_adt_message(patient_data),
+            'fhir_patient': self.fhir.create_patient_resource(patient_data),
+            'timestamp': datetime.now().isoformat()
+        }
+        return results
+    
+    def submit_clinical_record(self, record_data):
+        results = {}
+        if 'vital_signs' in record_data:
+            results['fhir_observation'] = self.fhir.create_observation_resource(
+                record_data['vital_signs']
+            )
+        if 'images' in record_data:
+            for img in record_data['images']:
+                results['pacs_storage'] = self.pacs.store_image(
+                    img.get('data', b''),
+                    img.get('metadata', {})
+                )
+        return results
+\end{lstlisting}
+
+\subsubsection{Simplified Integration}
+
+The facade simplifies complex multi-system operations:
+
+\begin{lstlisting}[language=Python, caption=Facade Usage in Patient Registration]
+if clinical_facade:
+    clinical_facade.register_patient({
+        'patient_id': patient.codice_fiscale,
+        'nome': patient.nome,
+        'cognome': patient.cognome
+    })
+\end{lstlisting}
 
 \subsection{Decorator Pattern (Implemented)}
+
 Used for authentication via the \texttt{@require\_login} decorator that protects sensitive routes by verifying user session presence.
 
 \begin{lstlisting}[language=Python, caption=Authentication Decorator]
@@ -295,35 +509,39 @@ def require_login(f):
         return f(*args, **kwargs)
     return decorated_function
 \end{lstlisting}
+
 \pagebreak
-\section{Conceptual Patterns}
-
-\subsection{Chain of Responsibility}
-Described in the architecture for data processing pipeline (validation, enrichment, privacy, triage). Currently implemented inline in routes, but ready for formal refactoring.
-
-\subsection{Observer Pattern}
-Planned for audit logging and metrics. Currently the system uses direct logging, but the architecture supports adding observers for system events.
-
-\subsection{Facade Pattern}
-Planned for future integrations with external systems (HL7/FHIR, PACS, LIS).
-
-\section{Summary}
+\section{Pattern Implementation Summary}
 
 \begin{table}[h]
 \centering
-\begin{tabular}{llp{6cm}}
+\begin{tabular}{llp{7cm}}
 \toprule
-\textbf{Pattern} & \textbf{Status} & \textbf{Notes} \\
+\textbf{Pattern} & \textbf{Status} & \textbf{Implementation Details} \\
 \midrule
-Strategy & Partial & AI module ready \\
-Decorator & Implemented & Route authentication \\
-Chain of Responsibility & Conceptual & Inline implementation \\
-Observer & Conceptual & Direct logging \\
-Facade & Planned & Future integrations \\
+Chain of Responsibility & Implemented & Data processing pipeline with validation, enrichment, privacy, and triage handlers \\
+Strategy & Implemented & AI model selection with Gemini active, OpenAI and Claude ready \\
+Observer & Implemented & Production monitoring with audit logging, metrics tracking, and alerting \\
+Facade & Implemented & Clinical systems integration for HL7/FHIR, PACS, and LIS \\
+Decorator & Implemented & Route authentication and authorization \\
 \bottomrule
 \end{tabular}
-\caption{Pattern Implementation Status}
+\caption{Design Pattern Implementation Status}
 \end{table}
+
+\section{Benefits and Impact}
+
+The implementation of these design patterns provides:
+
+\begin{itemize}
+    \item \textbf{Maintainability}: Clear separation of concerns and modular architecture
+    \item \textbf{Extensibility}: Easy addition of new AI models, handlers, and observers
+    \item \textbf{Monitoring}: Real-time system metrics and event tracking
+    \item \textbf{Integration}: Simplified interface for complex external systems
+    \item \textbf{Quality}: Consistent data processing and validation pipeline
+    \item \textbf{Security}: Centralized authentication and audit logging
+\end{itemize}
+
 
 \newpage
 

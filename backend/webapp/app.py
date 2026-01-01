@@ -47,6 +47,17 @@ except ImportError as e:
     AI_AVAILABLE = False
     MedicalDiagnosticsAI = None
 
+# Design Patterns
+try:
+    from src.patterns.chain_of_responsibility import DataProcessingPipeline
+    from src.patterns.strategy import AIModelContext, GeminiStrategy
+    from src.patterns.observer import MonitoringSystem
+    from src.patterns.facade import ClinicalSystemsFacade
+    PATTERNS_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Design patterns not available: {e}")
+    PATTERNS_AVAILABLE = False
+
 app = Flask(__name__)
 app.secret_key = Config.FLASK_SECRET_KEY
 app.config['UPLOAD_FOLDER'] = Path(__file__).parent / 'uploads'
@@ -114,17 +125,22 @@ db = None
 db_connected = False
 ai_diagnostics = None
 chatbot_ai = None
+data_pipeline = None
+ai_strategy_context = None
+monitoring_system = None
+clinical_facade = None
+
 
 
 def initialize_system():
     """Initialize the clinical gateway system."""
     global db, db_connected, ai_diagnostics, chatbot_ai
+    global data_pipeline, ai_strategy_context, monitoring_system, clinical_facade
     
     try:
         # Initialize MongoDB
         if MONGODB_AVAILABLE:
             try:
-                # Use configuration from .env file
                 db = MongoDBPatientRepository(
                     connection_string=Config.MONGODB_CONNECTION_STRING,
                     database_name=Config.MONGODB_DATABASE_NAME,
@@ -152,7 +168,7 @@ def initialize_system():
         else:
             print("⚠️  AI Diagnostics not available (missing API key or module)")
         
-        # Initialize Chatbot AI (con chiave separata)
+        # Initialize Chatbot AI
         if AI_AVAILABLE and hasattr(Config, 'CHATBOT_GEMINI_API_KEY') and Config.CHATBOT_GEMINI_API_KEY:
             try:
                 chatbot_ai = MedicalDiagnosticsAI(api_key=Config.CHATBOT_GEMINI_API_KEY)
@@ -162,6 +178,28 @@ def initialize_system():
                 chatbot_ai = None
         else:
             print("⚠️  Chatbot AI not available (missing CHATBOT_GEMINI_API_KEY)")
+        
+        # Initialize Design Patterns
+        if PATTERNS_AVAILABLE:
+            try:
+                data_pipeline = DataProcessingPipeline()
+                print("✅ Chain of Responsibility: Data Processing Pipeline initialized")
+                
+                if ai_diagnostics:
+                    gemini_strategy = GeminiStrategy(ai_diagnostics)
+                    ai_strategy_context = AIModelContext(gemini_strategy)
+                    print(f"✅ Strategy Pattern: AI Model Context initialized with {ai_strategy_context.get_current_model()}")
+                
+                monitoring_system = MonitoringSystem(db if db_connected else None)
+                print("✅ Observer Pattern: Monitoring System initialized")
+                
+                clinical_facade = ClinicalSystemsFacade()
+                print("✅ Facade Pattern: Clinical Systems Facade initialized")
+                
+            except Exception as e:
+                print(f"⚠️  Design Patterns initialization failed: {e}")
+        else:
+            print("⚠️  Design Patterns not available")
         
         return True
     except Exception as e:
@@ -507,6 +545,14 @@ def search_patient():
         return jsonify({'error': 'Codice fiscale obbligatorio'}), 400
     
     try:
+        if monitoring_system:
+            monitoring_system.log_event(
+                'patient_search',
+                f'Searching for patient: {fiscal_code}',
+                user_id=session.get('doctor_id'),
+                severity='info'
+            )
+        
         patient_data = db.find_by_fiscal_code(fiscal_code)
         if patient_data:
             return jsonify({'success': True, 'patient': patient_data})
@@ -604,8 +650,36 @@ def create_patient():
             else:
                 patient.malattie_permanenti = [data['malattie_permanenti']]
         
+        # Process through Chain of Responsibility pipeline
+        if data_pipeline:
+            patient_dict = {
+                'fiscal_code': patient.codice_fiscale,
+                'birth_date': patient.data_nascita.isoformat(),
+                'nome': patient.nome,
+                'cognome': patient.cognome
+            }
+            processed_data = data_pipeline.process(patient_dict)
+        
         # Save to database
         db.save_patient(patient)
+        
+        # Log event with Observer pattern
+        if monitoring_system:
+            monitoring_system.log_event(
+                'patient_created',
+                f'New patient created: {patient.nome} {patient.cognome}',
+                user_id=session.get('doctor_id'),
+                severity='info',
+                metadata={'codice_fiscale': patient.codice_fiscale}
+            )
+        
+        # Register with clinical systems facade
+        if clinical_facade:
+            clinical_facade.register_patient({
+                'patient_id': patient.codice_fiscale,
+                'nome': patient.nome,
+                'cognome': patient.cognome
+            })
         
         return jsonify({
             'success': True, 
@@ -1082,13 +1156,34 @@ def upload_file():
 @app.route('/api/metrics', methods=['GET'])
 @require_login
 def get_metrics():
-    """Get system metrics."""
-    # Metrics observer removed
-    return jsonify({'success': True, 'metrics': {
-        'requests_total': 0,
-        'uptime_seconds': 0,
-        'success_rate': 0
-    }})
+    """Get system metrics from Observer pattern."""
+    if monitoring_system:
+        metrics = monitoring_system.get_metrics()
+        return jsonify({
+            'success': True, 
+            'metrics': metrics,
+            'patterns_active': {
+                'chain_of_responsibility': data_pipeline is not None,
+                'strategy': ai_strategy_context is not None,
+                'observer': monitoring_system is not None,
+                'facade': clinical_facade is not None
+            }
+        })
+    
+    return jsonify({
+        'success': True, 
+        'metrics': {
+            'total_events': 0,
+            'events_by_type': {},
+            'last_event_time': None
+        },
+        'patterns_active': {
+            'chain_of_responsibility': False,
+            'strategy': False,
+            'observer': False,
+            'facade': False
+        }
+    })
 
 
 @app.route('/api/export/<fiscal_code>', methods=['GET', 'POST'])
@@ -1517,12 +1612,27 @@ def generate_diagnosis():
         
         # Check if doctor has access to this patient (if doctor_id field exists)
         doctor_id = session.get('doctor_id')
-        # Note: Not all patients have doctor_id field, so we skip this check for now
         
-        # Generate diagnosis using AI
+        # Generate diagnosis using Strategy pattern
         print(f"Generating diagnosis for patient: {fiscal_code}")
-        diagnosis_result = ai_diagnostics.generate_diagnosis(patient_data)
+        
+        if ai_strategy_context:
+            diagnosis_result = ai_strategy_context.generate_diagnosis(patient_data)
+            print(f"Using AI model: {ai_strategy_context.get_current_model()}")
+        else:
+            diagnosis_result = ai_diagnostics.generate_diagnosis(patient_data)
+        
         print(f"Diagnosis result success: {diagnosis_result.get('success')}")
+        
+        # Log diagnosis event with Observer pattern
+        if monitoring_system:
+            monitoring_system.log_event(
+                'diagnosis_generated',
+                f'AI diagnosis generated for patient {fiscal_code}',
+                user_id=doctor_id,
+                severity='info',
+                metadata={'patient_id': fiscal_code}
+            )
         
         if not diagnosis_result.get('success'):
             error_msg = diagnosis_result.get('error', 'Unknown error')
