@@ -3,7 +3,7 @@
 \contentsline {chapter}{\numberline {1}Introduction}{5}{chapter.1}%
 \contentsline {section}{\numberline {1.1}Overview and Vision}{5}{section.1.1}%
 \contentsline {subsection}{\numberline {1.1.1}Problem Statement}{5}{subsection.1.1.1}%
-\contentsline {subsection}{\numberline {1.1.2}Solution Approach}{5}{subsection.1.1.2}%
+\contentsline {subsection}{\numberline {1.1.2}Solution Approach}{6}{subsection.1.1.2}%
 \contentsline {section}{\numberline {1.2}Key Features}{6}{section.1.2}%
 \contentsline {chapter}{\numberline {2}Technical Architecture}{7}{chapter.2}%
 \contentsline {section}{\numberline {2.1}System Overview}{7}{section.2.1}%

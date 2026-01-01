@@ -15,6 +15,7 @@
 \usepackage{enumitem}
 \usepackage{amsmath}
 \usepackage{tikz}
+\usepackage{float}
 \usetikzlibrary{shapes.geometric, arrows, positioning}
 
 % Page geometry
@@ -95,7 +96,7 @@
     
     \vspace{2cm}
     
-    \includegraphics[width=0.3\textwidth]{logo.png}\par
+    \includegraphics[width=0.5\textwidth]{img/logo.png}\par
     
     \vspace{2cm}
     
@@ -205,44 +206,9 @@ The core of the backend is the \texttt{ClinicalGateway}, which differs fundament
 
 \subsection{Architecture Diagram}
 
-\begin{figure}[h]
+\begin{figure}[H]
 \centering
-\begin{tikzpicture}[
-    node distance=1.2cm,
-    box/.style={rectangle, draw, rounded corners, minimum width=3cm, minimum height=0.8cm, align=center, fill=blue!10},
-    arrow/.style={->, >=stealth, thick}
-]
-    % Frontend
-    \node[box, fill=green!20] (frontend) {React Frontend};
-    
-    % API Gateway
-    \node[box, below=of frontend] (api) {Flask API Layer};
-    
-    % Gateway
-    \node[box, below=of api, fill=orange!20] (gateway) {Clinical Gateway};
-    
-    % Handlers
-    \node[box, below left=1.5cm and 0cm of gateway, minimum width=2.5cm] (valid) {Validation};
-    \node[box, right=0.3cm of valid, minimum width=2.5cm] (enrich) {Enrichment};
-    \node[box, right=0.3cm of enrich, minimum width=2.5cm] (privacy) {Privacy};
-    \node[box, right=0.3cm of privacy, minimum width=2.5cm] (triage) {Triage};
-    
-    % AI and DB
-    \node[box, below=3cm of gateway, fill=purple!20] (ai) {Gemini AI};
-    \node[box, left=1cm of ai, fill=yellow!20] (mongodb) {MongoDB};
-    \node[box, right=1cm of ai] (audit) {Audit System};
-    
-    % Arrows
-    \draw[arrow] (frontend) -- (api);
-    \draw[arrow] (api) -- (gateway);
-    \draw[arrow] (gateway) -- (valid);
-    \draw[arrow] (valid) -- (enrich);
-    \draw[arrow] (enrich) -- (privacy);
-    \draw[arrow] (privacy) -- (triage);
-    \draw[arrow] (gateway) -- (ai);
-    \draw[arrow] (gateway) -- (mongodb);
-    \draw[arrow] (gateway) -- (audit);
-\end{tikzpicture}
+\includegraphics[width=0.5\textwidth]{img/architecture-diagram.png}
 \caption{MAV System Architecture}
 \end{figure}
 
@@ -278,7 +244,7 @@ The clinical data processing follows a well-defined pipeline:
 
 The frontend communicates with the backend through a RESTful API interface. All requests include credentials for session management:
 
-\begin{lstlisting}[language=JavaScript, caption=Frontend API Call Example]
+\begin{lstlisting} 
 const response = await fetch(getApiUrl('/api/patient/search'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -329,7 +295,7 @@ def require_login(f):
         return f(*args, **kwargs)
     return decorated_function
 \end{lstlisting}
-
+\pagebreak
 \section{Conceptual Patterns}
 
 \subsection{Chain of Responsibility}
