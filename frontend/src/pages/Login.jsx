@@ -100,8 +100,7 @@ export default function Login({ onLogin }) {
     <div className="login-container">
       <div className="login-box">
         <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
-          <img src="/logo.png" alt="Logo" style={{ height: '4rem', width: 'auto', marginBottom: '1rem' }} />
-          <h2>MAV -Medical Access & Vision</h2>
+          <h2>MAV - Medical Access & Vision</h2>
         </div>
 
         <div className="tabs">
