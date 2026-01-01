@@ -1,0 +1,53 @@
+services:
+  # Backend Flask/Python
+  - type: web
+    name: earlycare-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 wsgi:app
+    envVars:
+      # MongoDB
+      - key: MONGODB_CONNECTION_STRING
+        sync: false
+      - key: MONGODB_DATABASE_NAME
+        value: earlycare
+      - key: MONGODB_USE_SSL
+        value: true
+      - key: MONGODB_SSL_ALLOW_INVALID_CERTIFICATES
+        value: true
+      
+      # Flask
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_DEBUG
+        value: false
+      
+      # AI APIs
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: CHATBOT_GEMINI_API_KEY
+        sync: false
+      
+      # Render specific
+      - key: RENDER
+        value: true
+      - key: FRONTEND_URL
+        sync: false
+      
+      # Upload settings
+      - key: MAX_UPLOAD_SIZE_MB
+        value: 100
+
+  # Frontend React/Vite
+  - type: web
+    name: earlycare-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://earlycare-backend.onrender.com
