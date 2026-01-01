@@ -628,7 +628,7 @@ This approach prevents:
     \item Identity fraud and impersonation
     \item Uncontrolled access to sensitive patient data
 \end{itemize}
-
+\pagebreak
 \subsection{User Management System}
 
 The platform will include a dedicated administrative management interface for user and role administration:
@@ -802,6 +802,103 @@ cd frontend
 npm install
 npm run dev
 \end{lstlisting}
+
+\section{Render Deployment}
+
+Render is a modern cloud platform that provides seamless deployment for web applications with automatic SSL, continuous deployment from Git, and managed infrastructure.
+
+\subsection{Platform Overview}
+
+Render offers several advantages for deploying MAV:
+
+\begin{itemize}
+    \item \textbf{Automatic HTTPS}: Free SSL certificates with automatic renewal
+    \item \textbf{Git Integration}: Automatic deployments triggered by repository commits
+    \item \textbf{Zero-Downtime Deploys}: Rolling updates without service interruption
+    \item \textbf{Managed Infrastructure}: No server management required
+    \item \textbf{Environment Variables}: Secure configuration management through web dashboard
+    \item \textbf{Custom Domains}: Support for custom domain mapping
+    \item \textbf{Health Checks}: Automatic service monitoring and restart
+\end{itemize}
+
+\subsection{Service Configuration}
+
+MAV can be deployed on Render using two separate services:
+
+\subsubsection{Backend Service (Web Service)}
+
+\begin{itemize}
+    \item \textbf{Type}: Web Service
+    \item \textbf{Runtime}: Python 3.8+
+    \item \textbf{Build Command}: \texttt{pip install -r backend/requirements.txt}
+    \item \textbf{Start Command}: \texttt{python backend/webapp/app.py}
+    \item \textbf{Port}: Auto-detected from Flask application
+    \item \textbf{Health Check Path}: \texttt{/api/health} (recommended)
+\end{itemize}
+
+\subsubsection{Frontend Service (Static Site)}
+
+\begin{itemize}
+    \item \textbf{Type}: Static Site
+    \item \textbf{Build Command}: \texttt{cd frontend \&\& npm install \&\& npm run build}
+    \item \textbf{Publish Directory}: \texttt{frontend/dist}
+    \item \textbf{Auto-Deploy}: Enabled on main branch commits
+\end{itemize}
+
+\subsection{Deployment Steps}
+
+\begin{enumerate}
+    \item \textbf{Repository Connection}: Link GitHub/GitLab repository to Render
+    \item \textbf{Service Creation}: Create separate services for backend and frontend
+    \item \textbf{Environment Configuration}: Set required environment variables through Render dashboard
+    \item \textbf{Build Configuration}: Define build and start commands for each service
+    \item \textbf{Deploy}: Trigger initial deployment manually or via Git push
+    \item \textbf{Domain Setup}: Configure custom domain or use provided \texttt{.onrender.com} subdomain
+\end{enumerate}
+
+\subsection{Environment Configuration on Render}
+
+Environment variables must be configured in the Render dashboard for each service:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Service} & \textbf{Required Variables} \\
+\midrule
+Backend & GEMINI\_API\_KEY \\
+        & MONGODB\_CONNECTION\_STRING \\
+        & FLASK\_SECRET\_KEY \\
+        & FRONTEND\_URL \\
+\midrule
+Frontend & VITE\_API\_URL \\
+\bottomrule
+\end{tabular}
+\caption{Render Environment Variables by Service}
+\end{table}
+
+\subsection{Production Considerations}
+
+\begin{itemize}
+    \item \textbf{Instance Type}: Select appropriate instance size based on expected traffic
+    \item \textbf{Region Selection}: Choose region closest to primary user base for optimal latency
+    \item \textbf{Scaling}: Configure auto-scaling policies for backend service
+    \item \textbf{Monitoring}: Enable Render's built-in metrics and logging
+    \item \textbf{Backup Strategy}: Ensure MongoDB Atlas backups are configured independently
+\end{itemize}
+
+\subsection{Continuous Deployment Workflow}
+
+Render automatically deploys when changes are pushed to the configured branch:
+
+\begin{enumerate}
+    \item Developer pushes code to main branch
+    \item Render detects commit via webhook
+    \item Build process executes automatically
+    \item Health checks verify successful deployment
+    \item New version goes live with zero downtime
+    \item Previous version remains available for instant rollback
+\end{enumerate}
 
 \section{Environment Variables}
 
