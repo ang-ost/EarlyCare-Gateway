@@ -99,7 +99,10 @@ export default function Login({ onLogin }) {
   return (
     <div className="login-container">
       <div className="login-box">
-        <h2>Medical Access & Vision</h2>
+        <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+          <img src="/logo.png" alt="Logo" style={{ height: '4rem', width: 'auto', marginBottom: '1rem' }} />
+          <h2>MAV -Medical Access & Vision</h2>
+        </div>
 
         <div className="tabs">
           <button
@@ -232,28 +235,28 @@ export default function Login({ onLogin }) {
           <div className="modal success-modal" onClick={(e) => e.stopPropagation()}>
             <div className="success-icon"></div>
             <h3>Registrazione completata!</h3>
-            
-            <div style={{ 
-              marginTop: '1.5rem', 
-              padding: '1rem', 
-              background: '#f9fafb', 
-              borderRadius: '0.5rem', 
+
+            <div style={{
+              marginTop: '1.5rem',
+              padding: '1rem',
+              background: '#f9fafb',
+              borderRadius: '0.5rem',
               border: '2px solid #667eea',
               textAlign: 'center'
             }}>
               <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.5rem' }}>Il tuo ID medico è:</p>
-              <p style={{ 
-                fontSize: '1.8rem', 
-                fontWeight: 'bold', 
-                fontFamily: 'monospace', 
-                color: '#667eea', 
+              <p style={{
+                fontSize: '1.8rem',
+                fontWeight: 'bold',
+                fontFamily: 'monospace',
+                color: '#667eea',
                 letterSpacing: '2px',
                 marginBottom: '1rem'
               }}>
                 {newDoctorId}
               </p>
-              <button 
-                className="btn btn-secondary" 
+              <button
+                className="btn btn-secondary"
                 style={{ width: '100%' }}
                 onClick={() => {
                   navigator.clipboard.writeText(newDoctorId)
@@ -267,8 +270,8 @@ export default function Login({ onLogin }) {
               </p>
             </div>
 
-            <button 
-              className="btn btn-primary btn-block" 
+            <button
+              className="btn btn-primary btn-block"
               style={{ marginTop: '1.5rem' }}
               onClick={() => {
                 setShowSuccessModal(false)

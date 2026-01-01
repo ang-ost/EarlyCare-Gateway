@@ -52,7 +52,10 @@ export default function Profile({ user, onNavigate, onLogout }) {
   return (
     <>
       <header className="header">
-        <h1 style={{ cursor: 'pointer' }} onClick={() => onNavigate('dashboard')}>Medical Access & Vision</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer' }} onClick={() => onNavigate('dashboard')}>
+          <img src="/logo.png" alt="Logo" style={{ height: '2.5rem', width: 'auto' }} />
+          <h1 style={{ margin: 0 }}>MAV -Medical Access & Vision</h1>
+        </div>
         <div className="header-actions">
           <div className="user-menu">
             <button className="menu-button" onClick={() => setShowMenu(!showMenu)}>
