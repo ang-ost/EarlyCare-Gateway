@@ -1,0 +1,84 @@
+\babel@toc {english}{}\relax 
+\contentsline {chapter}{Abstract}{4}{chapter*.1}%
+\contentsline {chapter}{\numberline {1}Introduction}{5}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Overview and Vision}{5}{section.1.1}%
+\contentsline {subsection}{\numberline {1.1.1}Problem Statement}{5}{subsection.1.1.1}%
+\contentsline {subsection}{\numberline {1.1.2}Solution Approach}{5}{subsection.1.1.2}%
+\contentsline {section}{\numberline {1.2}Key Features}{6}{section.1.2}%
+\contentsline {chapter}{\numberline {2}Technical Architecture}{7}{chapter.2}%
+\contentsline {section}{\numberline {2.1}System Overview}{7}{section.2.1}%
+\contentsline {subsection}{\numberline {2.1.1}The Gateway Concept}{7}{subsection.2.1.1}%
+\contentsline {subsection}{\numberline {2.1.2}Architecture Diagram}{7}{subsection.2.1.2}%
+\contentsline {section}{\numberline {2.2}Data Flow Pipeline}{7}{section.2.2}%
+\contentsline {section}{\numberline {2.3}Component Interaction}{8}{section.2.3}%
+\contentsline {subsection}{\numberline {2.3.1}Frontend-Backend Communication}{8}{subsection.2.3.1}%
+\contentsline {subsection}{\numberline {2.3.2}CORS Configuration}{9}{subsection.2.3.2}%
+\contentsline {chapter}{\numberline {3}Design Patterns Analysis}{10}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Implemented Patterns}{10}{section.3.1}%
+\contentsline {subsection}{\numberline {3.1.1}Strategy Pattern (Partially Implemented)}{10}{subsection.3.1.1}%
+\contentsline {subsection}{\numberline {3.1.2}Decorator Pattern (Implemented)}{10}{subsection.3.1.2}%
+\contentsline {section}{\numberline {3.2}Conceptual Patterns}{10}{section.3.2}%
+\contentsline {subsection}{\numberline {3.2.1}Chain of Responsibility}{10}{subsection.3.2.1}%
+\contentsline {subsection}{\numberline {3.2.2}Observer Pattern}{11}{subsection.3.2.2}%
+\contentsline {subsection}{\numberline {3.2.3}Facade Pattern}{11}{subsection.3.2.3}%
+\contentsline {section}{\numberline {3.3}Summary}{11}{section.3.3}%
+\contentsline {chapter}{\numberline {4}Technology Stack}{12}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Backend Technologies}{12}{section.4.1}%
+\contentsline {subsection}{\numberline {4.1.1}Python Flask Framework}{12}{subsection.4.1.1}%
+\contentsline {subsection}{\numberline {4.1.2}AI Integration}{12}{subsection.4.1.2}%
+\contentsline {subsection}{\numberline {4.1.3}Data Processing Libraries}{12}{subsection.4.1.3}%
+\contentsline {subsection}{\numberline {4.1.4}Database Connectivity}{13}{subsection.4.1.4}%
+\contentsline {section}{\numberline {4.2}Frontend Technologies}{13}{section.4.2}%
+\contentsline {subsection}{\numberline {4.2.1}React 18 with Vite}{13}{subsection.4.2.1}%
+\contentsline {subsection}{\numberline {4.2.2}State Management}{13}{subsection.4.2.2}%
+\contentsline {subsection}{\numberline {4.2.3}Styling}{13}{subsection.4.2.3}%
+\contentsline {section}{\numberline {4.3}Infrastructure}{13}{section.4.3}%
+\contentsline {subsection}{\numberline {4.3.1}Database}{13}{subsection.4.3.1}%
+\contentsline {subsection}{\numberline {4.3.2}Containerization}{14}{subsection.4.3.2}%
+\contentsline {subsection}{\numberline {4.3.3}Dependencies Summary}{14}{subsection.4.3.3}%
+\contentsline {chapter}{\numberline {5}Core Components}{15}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Patient Management}{15}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Doctor Authentication}{15}{section.5.2}%
+\contentsline {section}{\numberline {5.3}Clinical Records}{15}{section.5.3}%
+\contentsline {subsection}{\numberline {5.3.1}Vital Signs Reference}{16}{subsection.5.3.1}%
+\contentsline {section}{\numberline {5.4}PDF Export}{16}{section.5.4}%
+\contentsline {chapter}{\numberline {6}AI and Diagnostics Engine}{17}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Overview}{17}{section.6.1}%
+\contentsline {section}{\numberline {6.2}Multimodal Capabilities}{17}{section.6.2}%
+\contentsline {section}{\numberline {6.3}Structured Output}{17}{section.6.3}%
+\contentsline {section}{\numberline {6.4}Error Handling}{18}{section.6.4}%
+\contentsline {section}{\numberline {6.5}Medical Chatbot}{18}{section.6.5}%
+\contentsline {chapter}{\numberline {7}Security and Privacy}{19}{chapter.7}%
+\contentsline {section}{\numberline {7.1}Authentication System}{19}{section.7.1}%
+\contentsline {subsection}{\numberline {7.1.1}Doctor Registration}{19}{subsection.7.1.1}%
+\contentsline {subsection}{\numberline {7.1.2}Session Management}{19}{subsection.7.1.2}%
+\contentsline {section}{\numberline {7.2}Data Protection}{19}{section.7.2}%
+\contentsline {subsection}{\numberline {7.2.1}Data at Rest}{19}{subsection.7.2.1}%
+\contentsline {subsection}{\numberline {7.2.2}Data in Transit}{19}{subsection.7.2.2}%
+\contentsline {subsection}{\numberline {7.2.3}Anonymization}{20}{subsection.7.2.3}%
+\contentsline {section}{\numberline {7.3}Audit Logging}{20}{section.7.3}%
+\contentsline {section}{\numberline {7.4}Compliance}{20}{section.7.4}%
+\contentsline {chapter}{\numberline {8}Database Architecture}{21}{chapter.8}%
+\contentsline {section}{\numberline {8.1}MongoDB Collections}{21}{section.8.1}%
+\contentsline {section}{\numberline {8.2}Indexing Strategy}{21}{section.8.2}%
+\contentsline {section}{\numberline {8.3}Connection Configuration}{21}{section.8.3}%
+\contentsline {chapter}{\numberline {9}Deployment Guide}{22}{chapter.9}%
+\contentsline {section}{\numberline {9.1}Docker Deployment}{22}{section.9.1}%
+\contentsline {subsection}{\numberline {9.1.1}Quick Start}{22}{subsection.9.1.1}%
+\contentsline {section}{\numberline {9.2}Manual Deployment}{22}{section.9.2}%
+\contentsline {subsection}{\numberline {9.2.1}Backend}{22}{subsection.9.2.1}%
+\contentsline {subsection}{\numberline {9.2.2}Frontend}{22}{subsection.9.2.2}%
+\contentsline {section}{\numberline {9.3}Environment Variables}{22}{section.9.3}%
+\contentsline {section}{\numberline {9.4}Troubleshooting}{22}{section.9.4}%
+\contentsline {chapter}{\numberline {10}Future Improvements}{24}{chapter.10}%
+\contentsline {section}{\numberline {10.1}Enhanced Security}{24}{section.10.1}%
+\contentsline {section}{\numberline {10.2}Native Applications}{24}{section.10.2}%
+\contentsline {section}{\numberline {10.3}OCR Integration}{24}{section.10.3}%
+\contentsline {section}{\numberline {10.4}Additional Features}{25}{section.10.4}%
+\contentsline {section}{\numberline {10.5}Implementation Roadmap}{25}{section.10.5}%
+\contentsline {chapter}{\numberline {11}Conclusion}{26}{chapter.11}%
+\contentsline {section}{\numberline {11.1}Summary}{26}{section.11.1}%
+\contentsline {section}{\numberline {11.2}Technical Excellence}{26}{section.11.2}%
+\contentsline {section}{\numberline {11.3}Future Vision}{26}{section.11.3}%
+\contentsline {chapter}{\numberline {A}API Reference}{28}{appendix.A}%
+\contentsline {section}{\numberline {A.1}Principali Endpoint}{28}{section.A.1}%
