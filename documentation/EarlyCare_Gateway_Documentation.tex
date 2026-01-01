@@ -280,7 +280,7 @@ The system implements several GoF (Gang of Four) design patterns to ensure maint
 
 \section{Implemented Patterns}
 
-\subsection{Chain of Responsibility Pattern (Implemented)}
+\subsection{Chain of Responsibility Pattern}
 
 The Chain of Responsibility pattern is implemented for the data processing pipeline, handling validation, enrichment, privacy compliance, and triage assessment in a sequential chain.
 
@@ -326,7 +326,7 @@ if data_pipeline:
     processed_data = data_pipeline.process(patient_dict)
 \end{lstlisting}
 
-\subsection{Strategy Pattern (Implemented)}
+\subsection{Strategy Pattern}
 
 The Strategy pattern enables runtime selection of different AI models for medical diagnosis generation. Currently supports Google Gemini with architecture ready for OpenAI GPT and Anthropic Claude.
 
@@ -365,7 +365,7 @@ else:
     diagnosis_result = ai_diagnostics.generate_diagnosis(patient_data)
 \end{lstlisting}
 
-\subsection{Observer Pattern (Implemented)}
+\subsection{Observer Pattern}
 
 The Observer pattern provides production monitoring through event logging, metrics tracking, and alerting capabilities.
 
@@ -439,7 +439,7 @@ def get_metrics():
         })
 \end{lstlisting}
 
-\subsection{Facade Pattern (Implemented)}
+\subsection{Facade Pattern}
 
 The Facade pattern provides a simplified interface for integration with external clinical systems including HL7/FHIR messaging, PACS, and LIS.
 
@@ -495,8 +495,8 @@ if clinical_facade:
         'cognome': patient.cognome
     })
 \end{lstlisting}
-
-\subsection{Decorator Pattern (Implemented)}
+\pagebreak
+\subsection{Decorator Pattern}
 
 Used for authentication via the \texttt{@require\_login} decorator that protects sensitive routes by verifying user session presence.
 
@@ -510,7 +510,6 @@ def require_login(f):
     return decorated_function
 \end{lstlisting}
 
-\pagebreak
 \section{Pattern Implementation Summary}
 
 \begin{table}[h]
