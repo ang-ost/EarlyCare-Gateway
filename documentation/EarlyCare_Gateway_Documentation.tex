@@ -470,13 +470,54 @@ The module manages the entire patient lifecycle with support for:
 
 \section{Doctor Authentication}
 
-Authentication system for doctors with:
+The authentication system implements a secure, admin-controlled registration process to prevent unauthorized access and fraudulent doctor ID generation.
+
+\subsection{Doctor ID Generation Algorithm}
+
+Doctor IDs are automatically generated using a cryptographically secure algorithm that creates unique, memorable identifiers:
 
 \begin{itemize}
-    \item Automatically generated unique mnemonic ID (e.g., MR7X9Z)
-    \item SHA-256 password hashing
-    \item Session management with secure cookies
-    \item Specialization and affiliated hospital support
+    \item \textbf{Format}: 6-character alphanumeric code (e.g., MR7X9Z, AB4K2L)
+    \item \textbf{Structure}: First letter of first name + First letter of last name + 4 random characters
+    \item \textbf{Character Set}: Uppercase letters (A-Z) and digits (0-9)
+    \item \textbf{Randomness}: Uses Python's \texttt{secrets} module for cryptographically strong random generation
+    \item \textbf{Uniqueness}: System checks for duplicates before assignment
+\end{itemize}
+
+\textbf{Example}: A doctor named "Mario Rossi" would receive an ID like "MR7X9Z" where:
+\begin{itemize}
+    \item M = First letter of "Mario"
+    \item R = First letter of "Rossi"
+    \item 7X9Z = Randomly generated secure suffix
+\end{itemize}
+
+\subsection{Admin-Controlled Registration}
+
+To prevent unauthorized access and fraudulent doctor ID creation, the registration functionality is restricted:
+
+\begin{itemize}
+    \item \textbf{Production Mode}: Only authenticated administrators can create new doctor accounts
+    \item \textbf{Regular Users}: See only the login form requiring existing doctor ID and password
+    \item \textbf{Admin Users}: Access both login and registration forms to create accounts for legitimate medical professionals
+    \item \textbf{ID Distribution}: Administrators securely share generated IDs with authorized doctors through verified channels
+\end{itemize}
+
+This two-tier access control ensures that:
+\begin{enumerate}
+    \item Non-medical personnel cannot obtain fake doctor IDs
+    \item All doctor accounts are verified and authorized by administrators
+    \item The system maintains a trusted registry of healthcare professionals
+    \item Accountability is maintained through controlled account creation
+\end{enumerate}
+
+\subsection{Authentication Features}
+
+\begin{itemize}
+    \item SHA-256 password hashing for secure credential storage
+    \item Session management with secure, HTTP-only cookies
+    \item 7-day session lifetime with automatic expiration
+    \item Support for doctor specialization and affiliated hospital tracking
+    \item Login attempt monitoring and rate limiting
 \end{itemize}
 
 \section{Clinical Records}
@@ -569,9 +610,74 @@ Dedicated AI instance for medical queries with:
 
 \section{Authentication System}
 
+\subsection{Access Control and Registration Security}
+
+The system implements a critical security measure to prevent unauthorized account creation:
+
+\begin{itemize}
+    \item \textbf{Admin-Only Registration}: Doctor account creation is restricted to authenticated administrators
+    \item \textbf{Public Interface}: Regular users only see the login form, preventing self-registration
+    \item \textbf{Verified Accounts}: All doctor accounts must be created by trusted administrators
+    \item \textbf{ID Security}: The cryptographically generated doctor IDs cannot be guessed or forged
+\end{itemize}
+
+This approach prevents:
+\begin{itemize}
+    \item Unauthorized individuals from creating fake doctor accounts
+    \item Self-registration by non-medical personnel
+    \item Identity fraud and impersonation
+    \item Uncontrolled access to sensitive patient data
+\end{itemize}
+
+\subsection{User Management System}
+
+The platform will include a dedicated administrative management interface for user and role administration:
+
+\subsubsection{Management Dashboard Features}
+
+\begin{itemize}
+    \item \textbf{User Data Management}: View, edit, and manage all registered doctor accounts
+    \item \textbf{Role Assignment}: Dynamically assign or modify user roles (Doctor, Admin)
+    \item \textbf{Testing Environment}: Secure environment for application testing and validation
+    \item \textbf{Account Status Control}: Activate, deactivate, or delete user accounts
+\end{itemize}
+
+\subsubsection{Role Management Capabilities}
+
+The management system enables administrators to:
+
+\begin{enumerate}
+    \item \textbf{Promote to Admin}: Elevate trusted doctors to administrator status for account management duties
+    \item \textbf{Revoke Admin Rights}: Demote administrators back to regular doctor status when necessary
+    \item \textbf{Deactivate Accounts}: Suspend access for retired doctors or those on leave
+    \item \textbf{Remove Accounts}: Permanently delete accounts for struck-off doctors or terminated personnel
+    \item \textbf{Audit Trail}: Track all role changes and account modifications for compliance
+\end{enumerate}
+
+\subsubsection{Use Cases}
+
+Common administrative scenarios handled by the management system:
+
+\begin{itemize}
+    \item \textbf{Retirement}: Deactivating accounts for doctors who have retired from practice
+    \item \textbf{Disciplinary Actions}: Removing access for doctors who have been struck off the medical register
+    \item \textbf{Temporary Leave}: Suspending accounts during sabbaticals or extended leave
+    \item \textbf{Admin Rotation}: Managing administrative privileges among trusted staff
+    \item \textbf{Emergency Access}: Quickly granting or revoking access in critical situations
+\end{itemize}
+
+This centralized management approach ensures:
+\begin{itemize}
+    \item Efficient user lifecycle management
+    \item Rapid response to personnel changes
+    \item Maintained system security and integrity
+    \item Compliance with healthcare regulatory requirements
+    \item Clear accountability through comprehensive audit logging
+\end{itemize}
+
 \subsection{Doctor Registration}
 \begin{itemize}
-    \item Unique mnemonic ID generation
+    \item Unique mnemonic ID generation using \texttt{secrets} module
     \item Password validation (minimum 6 characters)
     \item SHA-256 hashing
     \item Duplicate ID prevention
