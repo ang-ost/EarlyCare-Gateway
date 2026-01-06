@@ -538,10 +538,16 @@ def search_patient():
     data = request.json
     fiscal_code = data.get('fiscal_code', '').strip().upper()
     
+    print(f"\n🔍 === RICERCA PAZIENTE ===")
+    print(f"Codice fiscale richiesto: '{fiscal_code}'")
+    print(f"Doctor ID: {session.get('doctor_id')}")
+    
     if not db_connected:
+        print(f"❌ Database non connesso")
         return jsonify({'error': 'Database non connesso'}), 500
     
     if not fiscal_code:
+        print(f"❌ Codice fiscale vuoto")
         return jsonify({'error': 'Codice fiscale obbligatorio'}), 400
     
     try:
@@ -555,10 +561,16 @@ def search_patient():
         
         patient_data = db.find_by_fiscal_code(fiscal_code)
         if patient_data:
+            print(f"✅ Paziente trovato: {patient_data.get('nome')} {patient_data.get('cognome')}")
             return jsonify({'success': True, 'patient': patient_data})
+        
+        print(f"⚠️ Paziente non trovato con CF: {fiscal_code}")
         return jsonify({'success': False, 'message': 'Paziente non trovato'})
         
     except Exception as e:
+        print(f"❌ Errore nella ricerca paziente:")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 
@@ -568,7 +580,11 @@ def create_patient():
     """Create a new patient."""
     data = request.json
     
+    print(f"\n➕ === CREAZIONE PAZIENTE ===")
+    print(f"Data ricevuta: {data}")
+    
     if not db_connected:
+        print(f"❌ Database non connesso")
         return jsonify({'error': 'Database non connesso'}), 500
     
     try:
@@ -581,7 +597,9 @@ def create_patient():
              
         for field in required_fields:
             if not data.get(field):
-                return jsonify({'error': f'Campo obbligatorio mancante: {field}'}), 400
+                error_msg = f'Campo obbligatorio mancante: {field}'
+                print(f"❌ {error_msg}")
+                return jsonify({'error': error_msg}), 400
         
         # Handle identifiers
         if is_foreign:
@@ -593,13 +611,17 @@ def create_patient():
                      codice_fiscale = Patient.generate_foreign_id(data['nome'], data['cognome'])
              
              comune_nascita = data.get('comune_nascita', 'Estero').strip().title() if data.get('comune_nascita') else 'Estero'
+             print(f"📝 Paziente estero - CF generato: {codice_fiscale}")
         else:
              codice_fiscale = data['codice_fiscale'].strip().upper()
              comune_nascita = data['comune_nascita'].strip().title()
              
+             print(f"📝 Paziente italiano - CF: {codice_fiscale}, Comune: {comune_nascita}")
+             
              # Check if patient already exists
              existing = db.find_by_fiscal_code(codice_fiscale)
              if existing:
+                 print(f"⚠️ Paziente già esistente con CF: {codice_fiscale}")
                  return jsonify({'error': 'Paziente già esistente'}), 400
         
         
@@ -778,6 +800,9 @@ def calculate_cf():
     data = request.json
     
     try:
+        print(f"\n🧮 === RICHIESTA CALCOLO CF ===")
+        print(f"Data ricevuta: {data}")
+        
         from src.privacy.codice_fiscale import calculate_codice_fiscale
         
         # Extract data
@@ -789,11 +814,17 @@ def calculate_cf():
         
         if not all([cognome, nome, data_nascita, sesso, comune_nascita]):
             missing = [k for k in ['cognome', 'nome', 'data_nascita', 'sesso', 'comune_nascita'] if not data.get(k)]
-            return jsonify({'error': f'Dati incompleti: {", ".join(missing)}'}), 400
+            error_msg = f'Dati incompleti: {", ".join(missing)}'
+            print(f"❌ {error_msg}")
+            return jsonify({'error': error_msg}), 400
         
         # Convert date format from YYYY-MM-DD to DD/MM/YYYY for the function
         date_obj = datetime.strptime(data_nascita, '%Y-%m-%d')
         date_formatted = date_obj.strftime('%d/%m/%Y')
+        
+        print(f"📝 Parametri per calcolo:")
+        print(f"   Nome: {nome}, Cognome: {cognome}")
+        print(f"   Data: {date_formatted}, Sesso: {sesso}, Comune: {comune_nascita}")
         
         cf = calculate_codice_fiscale(
             cognome=cognome,
@@ -804,12 +835,16 @@ def calculate_cf():
         )
         
         if not cf:
-            return jsonify({'error': 'Impossibile calcolare il codice fiscale'}), 400
+            error_msg = 'Impossibile calcolare il codice fiscale'
+            print(f"❌ {error_msg}")
+            return jsonify({'error': error_msg}), 400
         
+        print(f"✅ Codice fiscale calcolato: {cf}")
         return jsonify({'codice_fiscale': cf})
         
     except Exception as e:
         import traceback
+        print(f"❌ ERRORE nel calcolo CF:")
         traceback.print_exc()
         return jsonify({'error': f'Errore nel calcolo: {str(e)}'}), 500
 

@@ -29,6 +29,15 @@ RUN pip install --no-cache-dir \
 COPY backend/src ./src
 COPY backend/webapp ./webapp
 
+# Verifica che i file importanti siano presenti
+RUN echo "Verifica file copiati:" && \
+    ls -la src/privacy/ && \
+    if [ -f "src/privacy/codici_catastali.json" ]; then \
+        echo "✓ codici_catastali.json trovato"; \
+        echo "Dimensione: $(wc -l < src/privacy/codici_catastali.json) righe"; \
+    else \
+        echo "❌ ATTENZIONE: codici_catastali.json NON trovato!"; \
+    fi
 
 # Copia le cartelle necessarie dalla root
 COPY cartelle_cliniche ./cartelle_cliniche
