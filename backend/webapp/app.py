@@ -72,13 +72,20 @@ allowed_origins = [origin.strip() for origin in frontend_url.split(',')]
 if 'localhost' not in frontend_url and '127.0.0.1' not in frontend_url:
     allowed_origins.extend(['http://localhost:5173', 'http://127.0.0.1:5173'])
 
+# TEMPORARY: In production, also allow any .onrender.com origin for testing
+is_production = os.getenv('RENDER', '').lower() in ['true', '1', 'yes']
+if is_production and frontend_url == 'http://localhost:5173':
+    print("⚠️  WARNING: FRONTEND_URL not configured, allowing all .onrender.com origins temporarily")
+    # Will be handled in after_request
+
 print(f"🌐 CORS allowed origins: {allowed_origins}")
+print(f"🌐 Production mode: {is_production}")
 
 # Configure CORS with more permissive settings
 CORS(app, 
      resources={
          r"/api/*": {
-             "origins": allowed_origins,
+             "origins": allowed_origins if not (is_production and frontend_url == 'http://localhost:5173') else "*",
              "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
              "allow_headers": ["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With"],
              "expose_headers": ["Content-Type", "Set-Cookie"],
@@ -103,12 +110,27 @@ print(f"🍪 Cookie config - Secure: {app.config['SESSION_COOKIE_SECURE']}, Same
 @app.after_request
 def after_request(response):
     origin = request.headers.get('Origin')
+    
+    # Log origin for debugging
+    if origin and request.path.startswith('/api/'):
+        print(f"📨 Request from origin: {origin} to {request.path}")
+    
+    # Allow configured origins
     if origin in allowed_origins:
         response.headers['Access-Control-Allow-Origin'] = origin
         response.headers['Access-Control-Allow-Credentials'] = 'true'
         response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, Accept, Origin, X-Requested-With'
         response.headers['Access-Control-Expose-Headers'] = 'Content-Type, Set-Cookie'
+    # TEMPORARY: In production, also allow .onrender.com origins if FRONTEND_URL not configured
+    elif is_production and origin and '.onrender.com' in origin:
+        print(f"⚠️  Allowing .onrender.com origin temporarily: {origin}")
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, Accept, Origin, X-Requested-With'
+        response.headers['Access-Control-Expose-Headers'] = 'Content-Type, Set-Cookie'
+    
     return response
 
 # Session configuration
