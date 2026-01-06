@@ -50,4 +50,4 @@ services:
     staticPublishPath: dist
     envVars:
       - key: VITE_API_URL
-        value: https://earlycare-backend.onrender.com
+        value: https://earlycare-gateway-backend.onrender.com
