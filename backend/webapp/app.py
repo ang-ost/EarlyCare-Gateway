@@ -2033,5 +2033,94 @@ def health():
     }), 200
 
 
+@app.route('/api/diagnostics')
+def diagnostics():
+    """Endpoint di diagnostica completo per troubleshooting."""
+    import sys
+    
+    diagnostics_info = {
+        'system': {
+            'python_version': sys.version,
+            'working_directory': os.getcwd(),
+            'is_production': is_production
+        },
+        'dependencies': {},
+        'codice_fiscale': {},
+        'database': {},
+        'files': {}
+    }
+    
+    # 1. Verifica dipendenze
+    required_packages = ['flask', 'flask_cors', 'pymongo', 'codicefiscale', 'reportlab']
+    for package in required_packages:
+        try:
+            if package == 'flask_cors':
+                import flask_cors
+                diagnostics_info['dependencies'][package] = 'installed'
+            else:
+                __import__(package)
+                diagnostics_info['dependencies'][package] = 'installed'
+        except ImportError:
+            diagnostics_info['dependencies'][package] = 'NOT INSTALLED'
+    
+    # 2. Verifica file codici_catastali.json
+    possible_paths = [
+        os.path.join(os.getcwd(), 'src', 'privacy', 'codici_catastali.json'),
+        os.path.join(os.path.dirname(__file__), '..', 'src', 'privacy', 'codici_catastali.json'),
+    ]
+    
+    for path in possible_paths:
+        diagnostics_info['files'][path] = {
+            'exists': os.path.exists(path),
+            'size': os.path.getsize(path) if os.path.exists(path) else 0
+        }
+    
+    # 3. Test modulo codice fiscale
+    try:
+        from src.privacy.codice_fiscale import load_codici_catastali, CODICEFISCALE_LIB_AVAILABLE
+        
+        diagnostics_info['codice_fiscale']['module_imported'] = True
+        diagnostics_info['codice_fiscale']['library_available'] = CODICEFISCALE_LIB_AVAILABLE
+        
+        codici = load_codici_catastali()
+        diagnostics_info['codice_fiscale']['codici_loaded'] = len(codici)
+        diagnostics_info['codice_fiscale']['sample_comuni'] = list(codici.keys())[:5]
+        
+        # Test calcolo
+        if CODICEFISCALE_LIB_AVAILABLE:
+            from src.privacy.codice_fiscale import calculate_codice_fiscale
+            cf = calculate_codice_fiscale('Mario', 'Rossi', '01/01/1990', 'BARI', 'M')
+            diagnostics_info['codice_fiscale']['test_calculation'] = cf or 'FAILED'
+        else:
+            diagnostics_info['codice_fiscale']['test_calculation'] = 'LIBRARY_NOT_AVAILABLE'
+            
+    except Exception as e:
+        diagnostics_info['codice_fiscale']['error'] = str(e)
+    
+    # 4. Database status
+    diagnostics_info['database']['connected'] = db_connected
+    if db_connected:
+        try:
+            # Count patients
+            count = db.patients_collection.count_documents({})
+            diagnostics_info['database']['patient_count'] = count
+            
+            # Get sample
+            if count > 0:
+                sample = list(db.patients_collection.find({}, {'codice_fiscale': 1, 'nome': 1, 'cognome': 1}).limit(3))
+                diagnostics_info['database']['sample_patients'] = [
+                    {
+                        'cf': p.get('codice_fiscale'),
+                        'nome': p.get('nome'),
+                        'cognome': p.get('cognome')
+                    }
+                    for p in sample
+                ]
+        except Exception as e:
+            diagnostics_info['database']['error'] = str(e)
+    
+    return jsonify(diagnostics_info), 200
+
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
