@@ -35,7 +35,7 @@ services:
       - key: RENDER
         value: true
       - key: FRONTEND_URL
-        sync: false
+        value: https://earlycare-gateway-frontend.onrender.com
       
       # Upload settings
       - key: MAX_UPLOAD_SIZE_MB
