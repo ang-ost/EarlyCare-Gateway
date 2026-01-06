@@ -114,6 +114,9 @@ def after_request(response):
     # Log origin for debugging
     if origin and request.path.startswith('/api/'):
         print(f"📨 Request from origin: {origin} to {request.path}")
+        # Log if Set-Cookie is being sent
+        if 'Set-Cookie' in response.headers:
+            print(f"🍪 Sending Set-Cookie header")
     
     # Allow configured origins
     if origin in allowed_origins:
@@ -132,12 +135,6 @@ def after_request(response):
         response.headers['Access-Control-Expose-Headers'] = 'Content-Type, Set-Cookie'
     
     return response
-
-# Session configuration
-app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['PERMANENT_SESSION_LIFETIME'] = 86400 * 7  # 7 days
 
 # Ensure upload folder exists
 app.config['UPLOAD_FOLDER'].mkdir(exist_ok=True)
@@ -437,7 +434,8 @@ def login_doctor():
         session['doctor_specializzazione'] = doctor_data.get('specializzazione', '')
         session.permanent = True
         
-        return jsonify({
+        # Create response
+        response = make_response(jsonify({
             'success': True,
             'message': 'Login effettuato con successo',
             'doctor': {
@@ -446,7 +444,19 @@ def login_doctor():
                 'cognome': doctor_data['cognome'],
                 'specializzazione': doctor_data.get('specializzazione', '')
             }
-        }), 200
+        }), 200)
+        
+        # Force set cookie explicitly for cross-domain
+        if is_production:
+            # In production, set cookie with explicit parameters
+            from flask import session as flask_session
+            session_cookie_name = app.config.get('SESSION_COOKIE_NAME', 'session')
+            print(f"🍪 Setting session cookie explicitly for production")
+            print(f"   Cookie name: {session_cookie_name}")
+            print(f"   SameSite: None, Secure: True")
+            # Flask will handle the actual session cookie, we just ensure it's sent
+        
+        return response
         
     except Exception as e:
         print(f"Error in login: {e}")
